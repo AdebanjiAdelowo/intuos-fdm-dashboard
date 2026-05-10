@@ -1,0 +1,16 @@
+general_envelope_limits:
+  acceleration_safety_range:
+    - -1.5
+    - 1.5
+  
+low_height_envelope_limits:
+  pitch_min: -10
+  pitch_max: 10
+  roll_min: -40
+  roll_max: 40
+  ground_speed_min: 50
+  acc_x_danger_range: 
+    - -0.001
+    - 0.001
+low_height_upper_limit: 100
+low_height_lower_limit: 30
