@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Docker Debug (debugpy)",
+      "type": "python",
+      "request": "attach",
+      "port": 5678,
+      "host": "localhost",
+      "pathMapping": {
+        "/app": "${workspaceFolder}"
+      },
+      "justMyCode": false,
+      "django": false
+    },
+    {
+      "name": "Local Debug",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app:app", "--reload", "--host", "0.0.0.0", "--port", "5001"],
+      "jinja": true,
+      "justMyCode": true
+    }
+  ]
+}
+
