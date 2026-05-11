@@ -1,6 +1,7 @@
 from db_connection_params_handler import ConnectionParamsHandler
 from db_handlers.ibm_db2.pilot_info_db_access import PilotInfoDBAccess
 from db_handlers.ibm_db2.db_query_manager import DatabaseManager
+from db_factory import make_db_manager
 from mappers.pilotinfo_mapper import PilotInfoMapper
 
 
@@ -17,13 +18,7 @@ def get_all_pilots_count(connection: ConnectionParamsHandler) -> list:
     -------
     list[dict]: A list of dictionaries, each representing a registration, containing the registration information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     pilot_getter = PilotInfoDBAccess(manager=db_manager)
     
     df_chunk_generator= pilot_getter.get_all_pilot_count()
@@ -43,13 +38,7 @@ def get_all_pilots_with_flights_count(connection: ConnectionParamsHandler) -> li
     -------
     list[dict]: A list of dictionaries, each representing a pilot, containing the pilot information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     pilot_getter = PilotInfoDBAccess(manager=db_manager)
     
     df_chunk_generator= pilot_getter.get_all_pilot_with_flights_count()
@@ -70,13 +59,7 @@ def get_all_pilots(connection: ConnectionParamsHandler) -> list:
     -------
     list[dict]: A list of dictionaries, each representing a pilot, containing the pilot information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     pilot_getter = PilotInfoDBAccess(manager=db_manager)
     df_chunk_generator=pilot_getter.get_all_pilot_info()
     if df_chunk_generator.dropna().empty:
@@ -105,13 +88,7 @@ def get_paginated_pilots(connection: ConnectionParamsHandler, start_date:str, en
     tuple
         A tuple containing (list of pilot dictionaries, total count of pilots).
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     
     pilot_getter = PilotInfoDBAccess(manager=db_manager)
     
@@ -161,13 +138,7 @@ def search_pilots(connection: ConnectionParamsHandler, start_date: str, end_date
     tuple
         A tuple containing (list of pilot dictionaries, total count of matching pilots).
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     
     pilot_getter = PilotInfoDBAccess(manager=db_manager)
     
@@ -218,13 +189,7 @@ def get_all_pilots_with_flights(connection: ConnectionParamsHandler) -> list:
     -------
     list[dict]: A list of dictionaries, each representing a registration, containing the registration information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     pilot_getter = PilotInfoDBAccess(manager=db_manager)
     df_chunk_generator=pilot_getter.get_all_pilot_with_flights_info()
     if df_chunk_generator.dropna().empty:

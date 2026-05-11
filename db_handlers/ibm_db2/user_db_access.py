@@ -7,9 +7,9 @@ class UserDBAccess:
         return self._manager.get_query_result(query)
 
     def get_user_by_codcf(self, codcf: str):
-        # query = f"SELECT * FROM ANA.ANACLI WHERE CODCF = '{codcf}'"
-        query = f"SELECT CODCF, STUDENTSN, EMAIL, TELEFONO1, TELEFONO2 FROM ANA.ANACLI WHERE CODCF = '{codcf}'"
-        return self._manager.get_query_result(query)
-    
-
-        
+        query = """
+            SELECT CODCF, STUDENTSN, EMAIL, TELEFONO1, TELEFONO2
+            FROM ANA.ANACLI
+            WHERE CODCF = ?
+        """
+        return self._manager.get_query_result(query, (codcf,))

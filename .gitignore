@@ -2,7 +2,17 @@
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .env
 .venv/
 venv/
 node_modules/
+
+# Local secrets / runtime state
+config.yml
+expiration_date.txt
+secret_key.json
+.secret_key_storage/
+dist/

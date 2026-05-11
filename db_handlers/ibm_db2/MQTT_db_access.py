@@ -35,11 +35,11 @@ class TelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
-        query = f"""SELECT * FROM ETL.ETL_MQTT_MESSAGE 
-                    WHERE DATETIME_MESSAGE >= '{start_datetime}' AND DATETIME_MESSAGE <= '{end_datetime}' 
+        query = """SELECT * FROM ETL.ETL_MQTT_MESSAGE
+                    WHERE DATETIME_MESSAGE >= ? AND DATETIME_MESSAGE <= ?
                     AND MQTT_CHANNEL IN ('N', 'E') AND MQTT_SUBTOPIC IN ('0', '1', '2','5', '6','7','9', 'V', '-')
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [start_datetime, end_datetime])
 
     def get_telemetry_by_marca_datetime_interval_unformatted(
         self, marca: str, start_datetime: str, end_datetime: str
@@ -63,11 +63,11 @@ class TelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
-        query = f"""SELECT * FROM ETL.ETL_MQTT_MESSAGE WHERE MARCHE = '{marca}' 
-                        AND DATETIME_MESSAGE >= '{start_datetime}' AND  DATETIME_MESSAGE<= '{end_datetime}' 
+        query = """SELECT * FROM ETL.ETL_MQTT_MESSAGE WHERE MARCHE = ?
+                        AND DATETIME_MESSAGE >= ? AND DATETIME_MESSAGE <= ?
                         AND MQTT_CHANNEL IN ('N', 'E') AND MQTT_SUBTOPIC IN ('0', '1', '2','5', '6','7','9', 'V', '-')
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
 
     def get_telemetry_by_marca_unformatted(self, marca: str):
         """
@@ -85,10 +85,10 @@ class TelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
-        query = f"""SELECT * FROM ETL.ETL_MQTT_MESSAGE WHERE MARCHE = '{marca}' 
+        query = """SELECT * FROM ETL.ETL_MQTT_MESSAGE WHERE MARCHE = ?
                         AND MQTT_CHANNEL IN ('N', 'E') AND MQTT_SUBTOPIC IN ('0', '1', '2','5', '6','7','9', 'V', '-')
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca])
     
     def get_telemetry_by_marcas_datetime_interval(
         self, marcas: str, start_datetime: str, end_datetime: str
@@ -112,6 +112,8 @@ class TelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
+        marcas = list(marcas)
+        placeholders = ", ".join("?" for _ in marcas)
         query = f"""
             WITH base_data AS (
                 SELECT
@@ -124,12 +126,12 @@ class TelemetryMQTTDatabaseAccess:
                     etl.etl_mqtt_message msg
                 JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                 WHERE
-                    msg.MARCHE IN {tuple(marcas)}  -- Handle multiple marques for filtering
-                    AND msg.flag_gps = '1' 
+                    msg.MARCHE IN ({placeholders})
+                    AND msg.flag_gps = '1'
                     AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
-                    AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2') 
+                    AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2')
                     AND msg.mqtt_channel = 'N'
-                    AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                    AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                     ),
            grouped_7 AS (
                 SELECT
@@ -216,12 +218,12 @@ class TelemetryMQTTDatabaseAccess:
                                     AND f.acc_x < {self.flight_envelope.get_low_height_limits().acc_x_danger_range[1]})) 
                             THEN 1 ELSE 0 END) AS alarm_high_pitch_at_low_height_with_low_acceleration
                 FROM
-                    final0 f 
-                JOIN 
+                    final0 f
+                JOIN
                     base.box_alarm b
-                    ON f.marche = b.marche 
+                    ON f.marche = b.marche
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, marcas + [start_datetime, end_datetime])
 
     def get_telemetry_by_flight(
         self, id_volo: int
@@ -399,13 +401,13 @@ class TelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                     WHERE
-                        msg.marche = '{marca}'
-                        AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES)  AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.marche = ?
+                        AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
-                        AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2') 
-                    ),  
+                        AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2')
+                    ),
                 grouped_7 AS (
                         SELECT
                             MAX(marche) AS marche,
@@ -489,10 +491,10 @@ class TelemetryMQTTDatabaseAccess:
                                         AND f.acc_x < {self.flight_envelope.get_low_height_limits().acc_x_danger_range[1]})) 
                                 THEN 1 ELSE 0 END) AS alarm_high_pitch_at_low_height_with_low_acceleration
                     FROM
-                        final0 f  
-                    INNER JOIN base.box_alarm b ON f.marche = b.marche 
+                        final0 f
+                    INNER JOIN base.box_alarm b ON f.marche = b.marche
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
     
 
     def get_alarm_by_marca(self, marca: str):
@@ -518,7 +520,7 @@ class TelemetryMQTTDatabaseAccess:
                     FROM
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
-                    WHERE msg.marche = '{marca}' 
+                    WHERE msg.marche = ?
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -607,7 +609,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca])
     
     def get_alarms_by_marca(self, marca: str):
         """
@@ -632,7 +634,7 @@ class TelemetryMQTTDatabaseAccess:
                     FROM
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
-                    WHERE msg.marche = '{marca}' 
+                    WHERE msg.marche = ?
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -721,7 +723,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca])
 
     def get_telemetry_by_marca(self, marca: str):
         """
@@ -747,7 +749,7 @@ class TelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                     WHERE
-                        msg.marche = '{marca}'
+                        msg.marche = ?
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -864,6 +866,8 @@ class TelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
+        marcas = list(marcas)
+        placeholders = ", ".join("?" for _ in marcas)
         query = f""" 
         
             WITH base_data AS (
@@ -877,12 +881,12 @@ class TelemetryMQTTDatabaseAccess:
                     etl.etl_mqtt_message msg
                 JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                 WHERE
-                    msg.MARCHE IN {tuple(marcas)}  -- Handle multiple marques for filtering
+                    msg.MARCHE IN ({placeholders})
                     AND msg.flag_gps = '1' 
                     AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
                     AND msg.mqtt_subtopic IN ('5', '6', '7', 'V') 
                     AND msg.mqtt_channel = 'N'
-                    AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                    AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                     ),
                 grouped_7 AS (
                     SELECT
@@ -970,7 +974,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b ON f.marche = b.marche
                 GROUP BY f.marche
         """       
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, list(marcas) + [start_datetime, end_datetime])
 
     def get_telemetry_alarms_by_mutiple_marcas_datetime_interval(
         self, marcas: tuple, start_datetime: str, end_datetime: str
@@ -994,6 +998,8 @@ class TelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
+        marcas = list(marcas)
+        placeholders = ", ".join("?" for _ in marcas)
         query = f""" 
                 WITH base_data AS (
                     SELECT
@@ -1006,12 +1012,12 @@ class TelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                     WHERE
-                        msg.MARCHE IN {tuple(marcas)}  -- Handle multiple marques for filtering
+                        msg.MARCHE IN ({placeholders})
                         AND msg.flag_gps = '1' 
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
                         AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2') 
                         AND msg.mqtt_channel = 'N'
-                        AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                        AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         ),
                     grouped_7 AS (
                         SELECT
@@ -1101,7 +1107,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche  
         """        
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, list(marcas) + [start_datetime, end_datetime])
     
     
     def get_telemetry_alarms_datetime_interval(
@@ -1144,7 +1150,7 @@ class TelemetryMQTTDatabaseAccess:
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
                         AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2') 
                         AND msg.mqtt_channel = 'N'
-                        AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                        AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         ),
                     grouped_7 AS (
                         SELECT
@@ -1234,7 +1240,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche  
         """        
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [start_datetime, end_datetime])
     
     def get_telemetry_alarms_by_flight(
         self, id_volo: int
@@ -1554,8 +1560,8 @@ class TelemetryMQTTDatabaseAccess:
                     etl.etl_mqtt_message msg 
                 JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                 WHERE
-                    msg.marche = '{marca}'
-                    AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                    msg.marche = ?
+                    AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                     AND msg.FLAG_GPS = '1'
                     AND TRANSLATE(msg.PAYLOAD_ALFA, '', '0123456789,.-+') = ''
                     AND msg.MQTT_SUBTOPIC IN ('5', '6', '7', 'V')
@@ -1654,7 +1660,7 @@ class TelemetryMQTTDatabaseAccess:
                 telemtery_data
             WHERE alarm_g_tot > 0 OR alarm_ground_speed > 0 OR alarm_vertical_speed > 0 OR alarm_pitch > 0 OR alarm_roll > 0 OR alarm_altitude > 0 OR alarm_hard_landing > 0 OR alarm_high_roll_at_low_height > 0 OR alarm_high_pitch_at_low_height_with_low_acceleration > 0 OR alarm_low_ground_speed_at_low_height_with_low_acceleration > 0 
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
     
 
     def get_top_flightswithalarms_by_marca_datetime_interval(
@@ -1693,8 +1699,8 @@ class TelemetryMQTTDatabaseAccess:
                     etl.etl_mqtt_message msg 
                 JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                 WHERE
-                    msg.marche = '{marca}'
-                    AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                    msg.marche = ?
+                    AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                     AND msg.FLAG_GPS = '1'
                     AND TRANSLATE(msg.PAYLOAD_ALFA, '', '0123456789,.-+') = ''
                     AND msg.MQTT_SUBTOPIC IN ('5', '6', '7', 'V')
@@ -1807,7 +1813,7 @@ class TelemetryMQTTDatabaseAccess:
             ORDER BY total_alarms DESC
             LIMIT {int(top)}
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
         
     def get_alarms_by_marca_datetime_interval(
         self, marca: str, start_datetime: str, end_datetime: str
@@ -1848,12 +1854,12 @@ class TelemetryMQTTDatabaseAccess:
                 etl.etl_mqtt_message msg
             JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
             WHERE
-                msg.marche = '{marca}'
+                msg.marche = ?
                 AND msg.flag_gps = '1' 
                 AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
                 AND msg.mqtt_subtopic IN ('5', '6', '7', 'V') 
                 AND msg.mqtt_channel = 'N'
-                AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                 ),
                 grouped_7 AS (
                     SELECT
@@ -1939,7 +1945,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche 
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
 
     def get_telemetry_alarms_by_marca_datetime_interval(
         self, marca: str, start_datetime: str, end_datetime: str
@@ -1976,12 +1982,12 @@ class TelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                     WHERE
-                        msg.marche = '{marca}'
+                        msg.marche = ?
                         AND msg.flag_gps = '1' 
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
                         AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2') 
                         AND msg.mqtt_channel = 'N'
-                        AND msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                        AND msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         ),
                 grouped_7 AS (
                     SELECT
@@ -2071,7 +2077,7 @@ class TelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche  
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
 
     def get_telemetry_alarms_by_marca(self, marca: str):
         """
@@ -2095,7 +2101,7 @@ class TelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN etl.voli voli ON msg.MARCHE = voli.MARCHE AND (msg.datetime_message BETWEEN voli.data_ora_decollo AND voli.data_ora_atterraggio)
                     WHERE
-                        msg.marche = '{marca}'
+                        msg.marche = ?
                         AND msg.flag_gps = '1' 
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
                         AND msg.mqtt_subtopic IN ('5', '6', '7', 'V', '0', '1', '2') 
@@ -2188,7 +2194,7 @@ class TelemetryMQTTDatabaseAccess:
                 JOIN
                     base.box_alarm b ON f.marche = b.marche  
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca])
 
 
 
@@ -2225,11 +2231,11 @@ class PilotTelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
-        query = f"""SELECT * FROM ETL.ETL_MQTT_MESSAGE 
-                    WHERE DATETIME_MESSAGE >= '{start_datetime}' AND DATETIME_MESSAGE <= '{end_datetime}' 
+        query = """SELECT * FROM ETL.ETL_MQTT_MESSAGE
+                    WHERE DATETIME_MESSAGE >= ? AND DATETIME_MESSAGE <= ?
                     AND MQTT_CHANNEL IN ('N', 'E') AND MQTT_SUBTOPIC IN ('0', '1', '2','5', '6','7','9', 'V', '-')
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [start_datetime, end_datetime])
 
     def get_telemetry_by_pilot_datetime_interval_unformatted(
         self, pilot: str, start_datetime: str, end_datetime: str
@@ -2265,11 +2271,11 @@ class PilotTelemetryMQTTDatabaseAccess:
                         FROM 
                             CLUB.CVOLATO CV
                         ) voli ON msg.MARCHE = voli.MARCHE 
-                    WHERE voli.pilot = '{pilot}' 
-                        AND msg.DATETIME_MESSAGE >= '{start_datetime}' AND msg.DATETIME_MESSAGE <= '{end_datetime}' 
+                    WHERE voli.pilot = ?
+                        AND msg.DATETIME_MESSAGE >= ? AND msg.DATETIME_MESSAGE <= ?
                         AND msg.MQTT_CHANNEL IN ('N', 'E') AND msg.MQTT_SUBTOPIC IN ('0', '1', '2','5', '6','7','9', 'V', '-')
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot, start_datetime, end_datetime])
 
     def get_telemetry_by_pilot_unformatted(self, pilot: str):
         """
@@ -2299,10 +2305,10 @@ class PilotTelemetryMQTTDatabaseAccess:
                         FROM 
                             CLUB.CVOLATO CV
                         ) voli ON msg.MARCHE = voli.MARCHE 
-                    WHERE voli.pilot = '{pilot}' 
+                    WHERE voli.pilot = ?
                         AND msg.MQTT_CHANNEL IN ('N', 'E') AND MQTT_SUBTOPIC IN ('0', '1', '2','5', '6','7','9', 'V', '-')
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot])
     
     def get_telemetry_by_pilots_datetime_interval(
         self, pilots: list, start_datetime: str, end_datetime: str
@@ -2326,6 +2332,8 @@ class PilotTelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
+        pilots = list(pilots)
+        placeholders = ", ".join("?" for _ in pilots)
         query = f"""
                 WITH pilot_flights AS (
                     SELECT 
@@ -2338,7 +2346,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE IN {tuple(pilots)}
+                        CV.CODCF_PAGANTE IN ({placeholders})
                 ),
                 base_data AS (
                     SELECT
@@ -2353,7 +2361,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -2444,10 +2452,10 @@ class PilotTelemetryMQTTDatabaseAccess:
                                         AND f.acc_x < {self.flight_envelope.get_low_height_limits().acc_x_danger_range[1]})) 
                                 THEN 1 ELSE 0 END) AS alarm_high_pitch_at_low_height_with_low_acceleration
                     FROM
-                        final0 f  
-                    INNER JOIN base.box_alarm b ON f.marche = b.marche 
+                        final0 f
+                    INNER JOIN base.box_alarm b ON f.marche = b.marche
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
 
     def get_telemetry_by_flight(
         self, id_volo: int
@@ -2630,7 +2638,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE = '{pilot}'
+                        CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -2645,7 +2653,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -2736,10 +2744,10 @@ class PilotTelemetryMQTTDatabaseAccess:
                                         AND f.acc_x < {self.flight_envelope.get_low_height_limits().acc_x_danger_range[1]})) 
                                 THEN 1 ELSE 0 END) AS alarm_high_pitch_at_low_height_with_low_acceleration
                     FROM
-                        final0 f  
-                    INNER JOIN base.box_alarm b ON f.marche = b.marche 
+                        final0 f
+                    INNER JOIN base.box_alarm b ON f.marche = b.marche
                 """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [marca, start_datetime, end_datetime])
     
 
     def get_alarm_by_pilot(self, pilot: str):
@@ -2766,7 +2774,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE = '{pilot}'
+                        CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -2874,7 +2882,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot])
     
     def get_alarms_by_pilot(self, pilot: str):
         """
@@ -2900,7 +2908,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE = '{pilot}'
+                        CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -3008,7 +3016,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot])
 
     def get_telemetry_by_pilot(self, pilot: str):
         """
@@ -3166,6 +3174,8 @@ class PilotTelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
+        pilots = list(pilots)
+        placeholders = ", ".join("?" for _ in pilots)
         query = f""" 
                 WITH pilot_flights AS (
                     SELECT 
@@ -3178,7 +3188,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE IN {tuple(pilots)}
+                        CV.CODCF_PAGANTE IN ({placeholders})
                 ),
                 base_data AS (
                     SELECT
@@ -3193,7 +3203,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -3289,7 +3299,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                             base.box_alarm b ON f.marche = b.marche
                         GROUP BY f.marche
                 """       
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, list(pilots) + [start_datetime, end_datetime])
 
     def get_telemetry_alarms_by_mutiple_pilots_datetime_interval(
         self, pilots: tuple, start_datetime: str, end_datetime: str
@@ -3313,6 +3323,8 @@ class PilotTelemetryMQTTDatabaseAccess:
         generator
             A generator which yields a pandas DataFrame containing the results of the query, chunk by chunk.
         """
+        pilots = list(pilots)
+        placeholders = ", ".join("?" for _ in pilots)
         query = f""" 
                 WITH pilot_flights AS (
                     SELECT 
@@ -3325,7 +3337,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE IN {tuple(pilots)}
+                        CV.CODCF_PAGANTE IN ({placeholders})
                 ),
                 base_data AS (
                     SELECT
@@ -3340,7 +3352,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -3436,7 +3448,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche  
         """        
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, list(pilots) + [start_datetime, end_datetime])
     
     
     def get_telemetry_alarms_datetime_interval(
@@ -3487,7 +3499,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -3583,7 +3595,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                     ON f.marche = b.marche  
         """        
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [start_datetime, end_datetime])
     
     def get_telemetry_alarms_by_flight(
         self, id_volo: int
@@ -3912,7 +3924,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                         TIMESTAMP(CV.DATA_VOLO, CV.STICK_LANDING) AS stick_landing
                     FROM 
                         CLUB.CVOLATO CV
-                    WHERE CV.CODCF_PAGANTE = '{pilot}'
+                    WHERE CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -3927,7 +3939,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
-                    WHERE msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                    WHERE msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -4032,7 +4044,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     telemtery_data
                 WHERE alarm_g_tot > 0 OR alarm_ground_speed > 0 OR alarm_vertical_speed > 0 OR alarm_pitch > 0 OR alarm_roll > 0 OR alarm_altitude > 0 OR alarm_hard_landing > 0 OR alarm_high_roll_at_low_height > 0 OR alarm_high_pitch_at_low_height_with_low_acceleration > 0 OR alarm_low_ground_speed_at_low_height_with_low_acceleration > 0 
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot, start_datetime, end_datetime])
     
 
     def get_top_flightswithalarms_by_pilot_datetime_interval(
@@ -4070,7 +4082,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                         TIMESTAMP(CV.DATA_VOLO, CV.STICK_LANDING) AS stick_landing
                     FROM 
                         CLUB.CVOLATO CV
-                    WHERE CV.CODCF_PAGANTE = '{pilot}'
+                    WHERE CV.CODCF_PAGANTE = ?
                 ), 
                 base_data AS (
                     SELECT
@@ -4085,7 +4097,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                         etl.etl_mqtt_message msg
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
-                    WHERE msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES)
+                    WHERE msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -4204,7 +4216,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     ORDER BY total_alarms DESC
                     LIMIT {int(top)}
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot, start_datetime, end_datetime])
         
     def get_alarms_by_pilot_datetime_interval(
         self, pilot: str, start_datetime: str, end_datetime: str
@@ -4242,7 +4254,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE = '{pilot}'
+                        CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -4257,7 +4269,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -4354,7 +4366,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     ON f.marche = b.marche 
                 GROUP BY f.marche
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot, start_datetime, end_datetime])
 
     def get_telemetry_alarms_by_pilot_datetime_interval(
         self, pilot: str, start_datetime: str, end_datetime: str
@@ -4391,7 +4403,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE = '{pilot}'
+                        CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -4406,7 +4418,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     JOIN pilot_flights pf ON msg.MARCHE = pf.marche 
                         AND (msg.datetime_message BETWEEN pf.block_takeoff AND pf.block_landing)
                     WHERE
-                        msg.datetime_message BETWEEN (TIMESTAMP('{start_datetime}') - 5 MINUTES) AND (TIMESTAMP('{end_datetime}') + 5 MINUTES) 
+                        msg.datetime_message BETWEEN (TIMESTAMP(CAST(? AS VARCHAR(26))) - 5 MINUTES) AND (TIMESTAMP(CAST(? AS VARCHAR(26))) + 5 MINUTES)
                         AND msg.flag_gps = '1'
                         AND msg.mqtt_channel = 'N'
                         AND TRANSLATE(msg.payload_alfa, '', '0123456789,.-+') = ''
@@ -4502,7 +4514,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     base.box_alarm b
                 ON f.marche = b.marche  
             """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot, start_datetime, end_datetime])
 
     def get_telemetry_alarms_by_pilot(self, pilot: str):
         """
@@ -4526,7 +4538,7 @@ class PilotTelemetryMQTTDatabaseAccess:
                     FROM 
                         CLUB.CVOLATO CV
                     WHERE 
-                        CV.CODCF_PAGANTE = '{pilot}'
+                        CV.CODCF_PAGANTE = ?
                 ),
                 base_data AS (
                     SELECT
@@ -4634,5 +4646,5 @@ class PilotTelemetryMQTTDatabaseAccess:
                 JOIN
                     base.box_alarm b ON f.marche = b.marche  
         """
-        return self.__manager.get_query_result(query)
+        return self.__manager.get_query_result(query, [pilot])
 

@@ -1,0 +1,15 @@
+# Copy this file to config.yml for local development, or configure these values
+# with DATABASE_* environment variables in production.
+database_user:
+  username: "your-bootstrap-db-user"
+  password: "your-bootstrap-db-password"
+  ip_address: "your-bootstrap-db-host"
+  port: "50000"
+  db_name: "YOUR_BOOTSTRAP_DB"
+
+database:
+  username: "your-db-user"
+  password: "your-db-password"
+  ip_address: "your-db-host"
+  port: "50000"
+  db_name: "YOUR_DB_NAME"

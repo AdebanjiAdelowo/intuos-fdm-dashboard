@@ -1,6 +1,7 @@
 from db_connection_params_handler import ConnectionParamsHandler
 from db_handlers.ibm_db2.airplane_info_db_access import AirplaneInfoDBAccess
 from db_handlers.ibm_db2.db_query_manager import DatabaseManager
+from db_factory import make_db_manager
 from mappers.airplaneinfo_mapper import AirplaneInfoMapper
 
 
@@ -17,13 +18,7 @@ def get_all_registrations_count(connection: ConnectionParamsHandler) -> list:
     -------
     list[dict]: A list of dictionaries, each representing a registration, containing the registration information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     registration_getter = AirplaneInfoDBAccess(manager=db_manager)
     
     df_chunk_generator= registration_getter.get_all_airplane_count()
@@ -43,13 +38,7 @@ def get_all_registrations_with_flights_count(connection: ConnectionParamsHandler
     -------
     list[dict]: A list of dictionaries, each representing a registration, containing the registration information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     registration_getter = AirplaneInfoDBAccess(manager=db_manager)
     
     df_chunk_generator= registration_getter.get_all_airplane_with_flights_count()
@@ -70,13 +59,7 @@ def get_all_registrations(connection: ConnectionParamsHandler) -> list:
     -------
     list[dict]: A list of dictionaries, each representing a registration, containing the registration information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     registration_getter = AirplaneInfoDBAccess(manager=db_manager)
     df_chunk_generator=registration_getter.get_all_airplane_info()
     if df_chunk_generator.dropna(how='all').empty:
@@ -101,13 +84,7 @@ def get_all_registrations_with_flights(connection: ConnectionParamsHandler) -> l
     -------
     list[dict]: A list of dictionaries, each representing a registration, containing the registration information.
     """
-    db_manager = DatabaseManager(
-        username=connection.username,
-        password=connection.password,
-        ip_address=connection.ip_address,
-        port=connection.port,
-        db_name=connection.db_name,
-    )
+    db_manager = make_db_manager(connection)
     registration_getter = AirplaneInfoDBAccess(manager=db_manager)
     df_chunk_generator=registration_getter.get_all_airplane_with_flights_info()
     if df_chunk_generator.dropna(how='all').empty:

@@ -1,13 +1,31 @@
-# import cProfile
 import asyncio
-from fastapi import FastAPI, Request, Depends, Query
-# from functools import lru_cache
+import os
+from datetime import datetime
+from typing import List
+
+from fastapi import FastAPI, Request, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+
+class RegistrationIdsBody(BaseModel):
+    registration_ids: List[str]
+
+
+class PilotIdsBody(BaseModel):
+    pilot_ids: List[str]
+
+
+def validate_date(date_str: str, param_name: str) -> None:
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{param_name} must be YYYY-MM-DD")
 
 from controllers.login import do_login, retrieve_connection_params
-from controllers.statistics import get_all_recent_alarms, get_all_recent_alarms_pre
+from controllers.statistics import get_all_recent_alarms_pre
 from controllers.registration import (
     get_all_registrations, 
     get_all_registrations_count, 
@@ -27,16 +45,11 @@ from controllers.pilots import (
 from controllers.telemetry import (
     get_flight_time_duration,
     get_alarms_by_registration_id,
-    get_all_recent_alarms_telemetry,
-    get_all_recent_alarms_telemetry_sync,
     get_all_recent_alarms_telemetry_pre,
-    get_all_recent_alarms_telemetry_by_id_sync,
     get_all_recent_alarms_telemetry_by_id_pre,
     get_flight_alarms_by_flight_id,
     get_top_flight_alarms_by_flight_id,
-    get_flight_telemetry_by_date_range_async,
     get_flight_telemetry_by_date_range_pre,
-    get_flight_telemetry_by_date_range_sync,
     get_flight_telemetry_with_alarms_and_labels,
     get_all_recent_alarms_by_registration_id,
     get_all_top_recent_alarms_by_registration_id,
@@ -70,16 +83,21 @@ from db_connection_params_handler import ConnectionParamsHandler
 
 app = FastAPI()
 
-connection_filename = "config.yml"
+connection_filename = os.getenv("ANALYSIS_DASHBOARD_CONFIG", "config.yml")
 
 origins = [
-    "*",
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",")
+    if origin.strip()
 ]
+
+# allow_credentials=True is incompatible with allow_origins=["*"] per the CORS spec.
+allow_credentials = origins != ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -88,7 +106,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 def get_connection():
-    return ConnectionParamsHandler(connection_filename=connection_filename)
+    return ConnectionParamsHandler.from_environment_or_file(connection_filename=connection_filename)
 
 
 @app.get("/luciano")
@@ -117,6 +135,16 @@ async def login(request: Request, connection: ConnectionParamsHandler = Depends(
     data = await request.json()
     email = data.get("email")
     password = data.get("password")
+    
+    # Development mode: skip login validation and just generate token
+    if os.getenv("DEV_BYPASS_LOGIN", "false").lower() == "true":
+        from controllers.login import generate_token
+        token = generate_token(email)
+        return JSONResponse(
+            status_code=200, 
+            content={"data": {"user": {"email": email}, "token": token}}
+        )
+    
     user, token = do_login(connection=connection,email=email,password=password,)
     if (user is None) or (token is None):
         return JSONResponse(status_code=401, content={"message": "Invalid credentials"})
@@ -201,7 +229,6 @@ async def get_registrations_with_flights(request: Request, connection: Connectio
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
     registrations = await asyncio.to_thread(get_all_registrations_with_flights, connection)
-    # registrations = await get_all_registrations_with_flights(connection)
     if len(registrations) > 0:
         return JSONResponse(status_code=200, content={"data": registrations})
     else:
@@ -238,7 +265,6 @@ async def get_registrations(request: Request, connection: ConnectionParamsHandle
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
     registrations = await asyncio.to_thread(get_all_registrations, connection)
-    # registrations = await get_all_registrations(connection)
     if len(registrations) > 0:
         return JSONResponse(status_code=200, content={"data": registrations})
     else:
@@ -431,7 +457,7 @@ async def get_registrations_count(request: Request, connection: ConnectionParams
         registrations_count = await asyncio.to_thread(get_all_registrations_count, connection)
         return JSONResponse(status_code=200, content={"data": int(registrations_count)})
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return JSONResponse(status_code=500, content={"message": str(e)})
     
 @app.get("/all_pilots_count")
 async def get_pilots_count(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -450,7 +476,7 @@ async def get_pilots_count(request: Request, connection: ConnectionParamsHandler
         pilots_count = await asyncio.to_thread(get_all_pilots_count, connection)
         return JSONResponse(status_code=200, content={"data": int(pilots_count)})
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return JSONResponse(status_code=500, content={"message": str(e)})
     
 @app.get("/registrations_with_flights_count")
 async def get_registrations_with_flights_count(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -467,10 +493,9 @@ async def get_registrations_with_flights_count(request: Request, connection: Con
     
     try:
         registrations_count = await asyncio.to_thread(get_all_registrations_with_flights_count, connection)
-        # registrations_count = await get_all_registrations_with_flights_count(connection)
         return JSONResponse(status_code=200, content={"data": int(registrations_count)})
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return JSONResponse(status_code=500, content={"message": str(e)})
     
 @app.get("/pilots_with_flights_count")
 async def get_pilots_with_flights_count(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -489,7 +514,7 @@ async def get_pilots_with_flights_count(request: Request, connection: Connection
         pilots_count = await asyncio.to_thread(get_all_pilots_with_flights_count, connection)
         return JSONResponse(status_code=200, content={"data": int(pilots_count)})
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})  
+        return JSONResponse(status_code=500, content={"message": str(e)})
           
 @app.get("/registrations/alarms/{start_date}/{end_date}")
 async def get_alarms(start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -503,13 +528,13 @@ async def get_alarms(start_date: str, end_date: str, request: Request, connectio
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms in the given date range or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)}) 
     recent_alarms = await asyncio.to_thread(get_all_recent_alarms_pre, connection, start_date, end_date)
-    # recent_alarms = await asyncio.to_thread(get_all_recent_alarms, connection, start_date, end_date)
-    # recent_alarms = await get_all_recent_alarms(connection, start_date, end_date)
 
     if len(recent_alarms) > 0:
         return JSONResponse(status_code=200, content={"data": recent_alarms})
@@ -528,12 +553,13 @@ async def get_top_registrations_by_alarms(top: str, start_date: str, end_date: s
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms in the given date range or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
     recent_alarms = await asyncio.to_thread(get_all_recent_alarms_pre, connection, start_date, end_date)
-    # recent_alarms = await get_all_recent_alarms(connection, start_date, end_date)
 
     if len(recent_alarms) > 0:
         return JSONResponse(status_code=200, content={"data": recent_alarms[:int(top)]})
@@ -598,6 +624,8 @@ async def get_flights_by_registration_and_date(
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the flights for the given registration id in the given date range or a status code of 400 if no flights are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:    
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -627,6 +655,8 @@ async def get_flights_by_pilot_and_date(
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the flights for the given registration id in the given date range or a status code of 400 if no flights are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:    
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -656,6 +686,8 @@ async def get_total_flewhourmins_by_pilot_and_date(
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the flights for the given registration id in the given date range or a status code of 400 if no flights are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -687,6 +719,8 @@ async def get_total_flewhourmins_by_registration_and_date(
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the flights for the given registration id in the given date range or a status code of 400 if no flights are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -704,90 +738,68 @@ async def get_total_flewhourmins_by_registration_and_date(
         return JSONResponse(status_code=204, content={"message": "no data"})
 
 @app.post("/registration/flights/{start_date}/{end_date}")
-async def get_flights_by_registration_and_date( 
-    start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)
+async def get_flights_by_registrations_and_date(
+    start_date: str, end_date: str, body: RegistrationIdsBody, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)
 ):
     """
     Returns a list of all flights for the given registration ids in the given time range.
 
     Path Parameters:
-        start_date (str): The start of the time range in ISO 8601 format
-        end_date (str): The end of the time range in ISO 8601 format
+        start_date (str): The start of the time range in YYYY-MM-DD format
+        end_date (str): The end of the time range in YYYY-MM-DD format
 
     Request body:
         registration_ids (list[str]): The list of registration ids to retrieve flights for.
 
     Returns:
-        JSONResponse: A JSON response containing the list of flights. The status code is 200 if flights are found, 400 otherwise.
+        JSONResponse: A JSON response containing the list of flights.
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
 
-    data = await request.json()
-    registration_ids = data.get("registration_ids")
-    
-    if isinstance(registration_ids, list): 
-        all_flights = await asyncio.to_thread(get_flights_by_registration_ids_and_date,
-                                                connection,
-                                                registration_ids,
-                                                start_date,
-                                                end_date
-                                                )
-    else:
-        registration_ids = [registration_ids]
-        all_flights = await asyncio.to_thread(get_flights_by_registration_ids_and_date,
-                                                connection,
-                                                registration_ids,
-                                                start_date,
-                                                end_date
-                                                )
+    all_flights = await asyncio.to_thread(get_flights_by_registration_ids_and_date,
+                                            connection,
+                                            body.registration_ids,
+                                            start_date,
+                                            end_date)
     if len(all_flights) > 0:
         return JSONResponse(status_code=200, content={"data": all_flights})
     else:
         return JSONResponse(status_code=204, content={"message": "no data"})
 
 @app.post("/pilot/flights/{start_date}/{end_date}")
-async def get_flights_by_pilots_and_date( 
-    start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)
+async def get_flights_by_pilots_and_date(
+    start_date: str, end_date: str, body: PilotIdsBody, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)
 ):
     """
-    Returns a list of all flights for the given registration ids in the given time range.
+    Returns a list of all flights for the given pilot ids in the given time range.
 
     Path Parameters:
-        start_date (str): The start of the time range in ISO 8601 format
-        end_date (str): The end of the time range in ISO 8601 format
+        start_date (str): The start of the time range in YYYY-MM-DD format
+        end_date (str): The end of the time range in YYYY-MM-DD format
 
     Request body:
         pilot_ids (list[str]): The list of pilot ids to retrieve flights for.
 
     Returns:
-        JSONResponse: A JSON response containing the list of flights. The status code is 200 if flights are found, 400 otherwise.
+        JSONResponse: A JSON response containing the list of flights.
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
 
-    data = await request.json()
-    pilot_ids = data.get("pilot_ids")
-    
-    if isinstance(pilot_ids, list): 
-        all_flights = await asyncio.to_thread(get_flights_by_pilot_ids_and_date,
-                                                connection,
-                                                pilot_ids,
-                                                start_date,
-                                                end_date
-                                                )
-    else:
-        pilot_ids = [pilot_ids]
-        all_flights = await asyncio.to_thread(get_flights_by_pilot_ids_and_date,
-                                                connection,
-                                                pilot_ids,
-                                                start_date,
-                                                end_date
-                                                )
+    all_flights = await asyncio.to_thread(get_flights_by_pilot_ids_and_date,
+                                            connection,
+                                            body.pilot_ids,
+                                            start_date,
+                                            end_date)
     if len(all_flights) > 0:
         return JSONResponse(status_code=200, content={"data": all_flights})
     else:
@@ -810,6 +822,8 @@ async def get_flight_telemetry_by_registration(
     - JSONResponse: A JSON response containing the telemetry. The status code is 200 if telemetry is found, 400 otherwise.
     """
 
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -841,6 +855,8 @@ async def get_flight_telemetry_by_pilot(
     - JSONResponse: A JSON response containing the telemetry. The status code is 200 if telemetry is found, 400 otherwise.
     """
 
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -857,57 +873,34 @@ async def get_flight_telemetry_by_pilot(
         return JSONResponse(status_code=204, content={"message": "no data"})
 
 @app.post("/registration/telemetry/{start_date}/{end_date}")
-async def get_flight_telemetry_by_registration(
-    start_date: str, end_date: str, request: Request , connection: ConnectionParamsHandler = Depends(get_connection)
+async def get_flight_telemetry_by_registrations(
+    start_date: str, end_date: str, body: RegistrationIdsBody, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)
 ):
     """
     Returns a list of telemetry with alarms for the given registrations and time range.
 
     Path Parameters:
-        start_date (str): The start of the time range in ISO 8601 format.
-        end_date (str): The end of the time range in ISO 8601 format.
+        start_date (str): The start of the time range in YYYY-MM-DD format.
+        end_date (str): The end of the time range in YYYY-MM-DD format.
 
     Request Body:
         registration_ids (list[str]): The list of registrations to retrieve telemetry for.
 
     Returns:
-        JSONResponse: A response containing the telemetry with alarms. The status code is 200 if telemetry is found, 400 otherwise.
+        JSONResponse: A response containing the telemetry with alarms.
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
 
-    data = await request.json()
-    registration_ids: list[str] = data.get("registration_ids")
-    
-    if isinstance(registration_ids, list):
-        all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_date_range_pre,
-                                                connection,
-                                                registration_ids,
-                                                start_date,
-                                                end_date)
-        
-        # all_telemetries = await get_flight_telemetry_by_date_range(
-        #                                 connection,
-        #                                 registration_ids,
-        #                                 start_date,
-        #                                 end_date
-        #                                 )
-    else:
-        registration_ids = [registration_ids]
-        all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_date_range_pre,
-                                                connection,
-                                                registration_ids,
-                                                start_date,
-                                                end_date)
-        
-        # all_telemetries = await get_flight_telemetry_by_date_range(
-        #                                     connection,
-        #                                     registration_ids,
-        #                                     start_date,
-        #                                     end_date
-        #                                     )
+    all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_date_range_pre,
+                                            connection,
+                                            body.registration_ids,
+                                            start_date,
+                                            end_date)
     if len(all_telemetries) > 0:
         return JSONResponse(status_code=200, content={"data": all_telemetries})
     else:
@@ -916,43 +909,33 @@ async def get_flight_telemetry_by_registration(
 
 @app.post("/pilot/telemetry/{start_date}/{end_date}")
 async def get_flight_telemetry_by_pilots(
-    start_date: str, end_date: str, request: Request , connection: ConnectionParamsHandler = Depends(get_connection)
+    start_date: str, end_date: str, body: PilotIdsBody, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)
 ):
     """
-    Returns a list of telemetry with alarms for the given registrations and time range.
+    Returns a list of telemetry with alarms for the given pilots and time range.
 
     Path Parameters:
-        start_date (str): The start of the time range in ISO 8601 format.
-        end_date (str): The end of the time range in ISO 8601 format.
+        start_date (str): The start of the time range in YYYY-MM-DD format.
+        end_date (str): The end of the time range in YYYY-MM-DD format.
 
     Request Body:
-        pilot_ids (list[str]): The list of registrations to retrieve telemetry for.
+        pilot_ids (list[str]): The list of pilot ids to retrieve telemetry for.
 
     Returns:
-        JSONResponse: A response containing the telemetry with alarms. The status code is 200 if telemetry is found, 400 otherwise.
+        JSONResponse: A response containing the telemetry with alarms.
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
 
-    data = await request.json()
-    pilot_ids: list[str] = data.get("registration_ids")
-    
-    if isinstance(pilot_ids, list):
-        all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_pilots_date_range,
-                                                    connection,
-                                                    pilot_ids,
-                                                    start_date,
-                                                    end_date)
-    else:
-        pilot_ids = [pilot_ids]
-        all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_pilots_date_range,
-                                                connection,
-                                                pilot_ids,
-                                                start_date,
-                                                end_date
-                                                )
+    all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_pilots_date_range,
+                                            connection,
+                                            body.pilot_ids,
+                                            start_date,
+                                            end_date)
     if len(all_telemetries) > 0:
         return JSONResponse(status_code=200, content={"data": all_telemetries})
     else:
@@ -1014,6 +997,8 @@ async def get_all_recent_alarms_by_registration(registration_id: str, start_date
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given registration id or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1032,7 +1017,7 @@ async def get_all_recent_alarms_by_registration(registration_id: str, start_date
     
 
 @app.get("/pilot/{pilot_id}/alarms/{start_date}/{end_date}")
-async def get_all_recent_alarms_by_registration(pilot_id: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
+async def get_all_recent_alarms_by_pilot(pilot_id: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
     """
     Returns a list of all alarms for the given pilot id.
 
@@ -1042,6 +1027,8 @@ async def get_all_recent_alarms_by_registration(pilot_id: str, start_date: str, 
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given pilot id or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1069,6 +1056,8 @@ async def get_top_recent_alarms_by_registration(registration_id: str, top: str, 
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given registration id or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1096,6 +1085,8 @@ async def get_top_recent_alarms_by_pilot(pilot_id: str, top: str, start_date: st
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given pilot id or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1124,6 +1115,8 @@ async def get_flight_with_alarms_by_registration(registration_id: str, start_dat
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given registration id or a status code of 400 if no alarms are found
     """
 
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1150,6 +1143,8 @@ async def get_flight_with_alarms_by_pilot(pilot_id: str, start_date: str, end_da
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given pilot id or a status code of 400 if no alarms are found
     """
 
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1175,6 +1170,8 @@ async def get_top_flight_with_alarms_by_registration(registration_id: str, top: 
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given registration id or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1201,6 +1198,8 @@ async def get_top_flight_with_alarms_by_pilot(pilot_id: str, top: str, start_dat
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the alarms for the given pilot id or a status code of 400 if no alarms are found
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
@@ -1271,15 +1270,15 @@ async def get_alarms_by_telemetry(start_date: str, end_date: str, request: Reque
     Returns:
         JSONResponse - A JSON response with a status code of 200 and a list of all the recent alarms in the given date range
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
     
-    # alarm_telemetry = await asyncio.to_thread(get_all_recent_alarms_telemetry_sync, connection, start_date, end_date)
     alarm_telemetry = await asyncio.to_thread(get_all_recent_alarms_telemetry_pre, connection, start_date, end_date)
 
-    # alarm_telemetry = await get_all_recent_alarms_telemetry(connection, start_date, end_date)
 
     if len(alarm_telemetry) > 0:
         return JSONResponse(status_code=200, content={"data": alarm_telemetry})
@@ -1288,57 +1287,32 @@ async def get_alarms_by_telemetry(start_date: str, end_date: str, request: Reque
 
 
 @app.post("/registration/alarms/telemetry/{start_date}/{end_date}")
-async def get_alarms_by_telemetry(start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
+async def get_alarms_by_registration_telemetry(start_date: str, end_date: str, body: RegistrationIdsBody, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
     """
     Returns a list of telemetry with alarms for the given registrations and time range.
 
-    Parameters:
-    - start_date (str): The start of the time range in ISO 8601 format.
-    - end_date (str): The end of the time range in ISO 8601 format.
-    - request (Request): The request object, used to retrieve the connection parameters.
+    Path Parameters:
+    - start_date (str): The start of the time range in YYYY-MM-DD format.
+    - end_date (str): The end of the time range in YYYY-MM-DD format.
 
     Request body:
     - registration_ids (list[str]): The list of registrations to retrieve telemetry for.
 
     Returns:
-    - JSONResponse: A response containing the telemetry with alarms. The status code is 200 if telemetry is found, 400 otherwise.
+    - JSONResponse: A response containing the telemetry with alarms.
     """
+    validate_date(start_date, "start_date")
+    validate_date(end_date, "end_date")
     try:
         connection = retrieve_connection_params(request=request, connection=connection)
     except Exception as e:
         return JSONResponse(status_code=401, content={"message": str(e)})
 
-    data = await request.json()
-    registration_ids: list[str] = data.get("registration_ids")
-    
-    if isinstance(registration_ids, list):
-        alarm_telemetries = await asyncio.to_thread(get_all_recent_alarms_telemetry_by_id_pre,
-                                                    connection,
-                                                    start_date,
-                                                    end_date,
-                                                    registration_ids)
-        
-        # alarm_telemetries = await get_all_recent_alarms_telemetry_by_id(
-        #                                             connection,
-        #                                             start_date,
-        #                                             end_date,
-        #                                             registration_ids
-        #                                             )
-    else:
-        registration_ids = [registration_ids]
-        alarm_telemetries = await asyncio.to_thread(get_all_recent_alarms_telemetry_by_id_pre,
-                                                    connection,
-                                                    start_date,
-                                                    end_date, 
-                                                    registration_ids)
-        
-        # alarm_telemetries = await get_all_recent_alarms_telemetry_by_id(
-        #                                             connection,
-        #                                             start_date,
-        #                                             end_date,
-        #                                             registration_ids
-        #                                             )
-            
+    alarm_telemetries = await asyncio.to_thread(get_all_recent_alarms_telemetry_by_id_pre,
+                                                connection,
+                                                start_date,
+                                                end_date,
+                                                body.registration_ids)
     if len(alarm_telemetries) > 0:
         return JSONResponse(status_code=200, content={"data": alarm_telemetries})
     else:
