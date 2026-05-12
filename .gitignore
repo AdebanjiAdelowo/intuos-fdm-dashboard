@@ -16,3 +16,6 @@ expiration_date.txt
 secret_key.json
 .secret_key_storage/
 dist/
+
+# Large training data exports
+notebooks/*.csv
