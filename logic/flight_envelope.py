@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 import yaml
 from datamodels import TelemetrySample
 
@@ -29,7 +30,7 @@ class FlightEnvelope:
         :return: None
         :rtype: None
         """
-        with open("flight_envelope_limits.yaml") as f:
+        with open(Path(__file__).parent.parent / "flight_envelope_limits.yaml") as f:
             limits = yaml.safe_load(f)
         self._general_limits = GeneralFlightEnvelopeLimits(
             **limits["general_envelope_limits"]

@@ -839,11 +839,11 @@ class TelemetryMQTTDatabaseAccess:
                                 THEN 1 ELSE 0 END) AS alarm_high_pitch_at_low_height_with_low_acceleration
                     FROM
                         final0 f   
-                    JOIN 
-                        base.box_alarm b ON f.marche = b.marche  
+                    JOIN
+                        base.box_alarm b ON f.marche = b.marche
             """
-        return self.__manager.get_query_result_generator(query)
-    
+        return self.__manager.get_query_result(query, params=(marca,))
+
     def get_alarms_by_mutiple_marcas_datetime_interval(
         self, marcas: tuple, start_datetime: str, end_datetime: str
     ):
