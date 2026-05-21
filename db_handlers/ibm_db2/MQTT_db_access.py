@@ -395,7 +395,7 @@ class TelemetryMQTTDatabaseAccess:
                         msg.datetime_message,
                         msg.mqtt_channel,
                         msg.mqtt_subtopic,
-                        msg.payload_alfa,
+                        msg.payload_alfa,   
                         msg.marche
                     FROM
                         etl.etl_mqtt_message msg

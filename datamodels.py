@@ -16,7 +16,7 @@ class AirplaneDatasheet:
     def as_dict(self) -> dict:
         return {
             "id": self.id,
-            "registration_name": self.registration_name,
+            "marche": self.registration_name,
             "country": self.country,
             "typedesignator": self.typedesignator,
         }
@@ -221,7 +221,7 @@ class TelemetrySample:
 
     @magnetic_heading.setter
     def magnetic_heading(self, value: float) -> None:
-        if abs(value) < 360:
+        if value is not None and abs(value) < 360:
             self.__magnetic_heading = value
 
     @property
@@ -230,7 +230,7 @@ class TelemetrySample:
 
     @acc_x.setter
     def acc_x(self, value: float) -> None:
-        if abs(value) < 9:
+        if value is not None and abs(value) < 9:
             self.__acc_x = value
 
     @property
@@ -239,7 +239,7 @@ class TelemetrySample:
 
     @acc_y.setter
     def acc_y(self, value: float) -> None:
-        if abs(value) < 9:
+        if value is not None and abs(value) < 9:
             self.__acc_y = value
 
     @property
@@ -248,16 +248,16 @@ class TelemetrySample:
 
     @acc_z.setter
     def acc_z(self, value: float) -> None:
-        if abs(value) < 9:
+        if value is not None and abs(value) < 9:
             self.__acc_z = value
 
     @property
     def pitch(self) -> Optional[float]:
-        return -self.__pitch
+        return -self.__pitch if self.__pitch is not None else None
 
     @pitch.setter
     def pitch(self, value: float) -> None:
-        if abs(value) < 180:
+        if value is not None and abs(value) < 180:
             self.__pitch = value
 
     @property
@@ -266,7 +266,7 @@ class TelemetrySample:
 
     @roll.setter
     def roll(self, value: float) -> None:
-        if abs(value) < 180:
+        if value is not None and abs(value) < 180:
             self.__roll = value
 
     @property
@@ -275,7 +275,7 @@ class TelemetrySample:
 
     @turn_rate.setter
     def turn_rate(self, value: float) -> None:
-        if abs(value) < 180:
+        if value is not None and abs(value) < 180:
             self.__turn_rate = value
 
     @property
@@ -284,7 +284,7 @@ class TelemetrySample:
 
     @latitude.setter
     def latitude(self, value: float) -> None:
-        if abs(value) < 90:
+        if value is not None and abs(value) < 90:
             self.__latitude = value
 
     @property
@@ -293,7 +293,7 @@ class TelemetrySample:
 
     @longitude.setter
     def longitude(self, value: float) -> None:
-        if abs(value) < 180:
+        if value is not None and abs(value) < 180:
             self.__longitude = value
 
     @property
@@ -302,7 +302,7 @@ class TelemetrySample:
 
     @altitude.setter
     def altitude(self, value: float) -> None:
-        if value < 100_000:
+        if value is not None and value < 100_000:
             self.__altitude = value
 
     @property
@@ -311,7 +311,7 @@ class TelemetrySample:
 
     @ground_speed.setter
     def ground_speed(self, value: float) -> None:
-        if value < 1000:
+        if value is not None and value < 1000:
             self.__ground_speed = value
 
     @property
@@ -320,7 +320,7 @@ class TelemetrySample:
 
     @heading.setter
     def heading(self, value: float) -> None:
-        if abs(value) < 360:
+        if value is not None and abs(value) < 360:
             self.__heading = value
 
     @property
@@ -329,7 +329,7 @@ class TelemetrySample:
 
     @pressure.setter
     def pressure(self, value: float) -> None:
-        if value < 10000:
+        if value is not None and value < 10000:
             self.__pressure = value
 
     @property
@@ -338,17 +338,17 @@ class TelemetrySample:
 
     @pressure_altitude.setter
     def pressure_altitude(self, value: float) -> None:
-        if value < 10000:
+        if value is not None and value < 10000:
             self.__pressure_altitude = value
 
     @property
     def vertical_speed(self) -> Optional[float]:
         # conversion from ft/s to ft/min
-        return self.__vertical_speed * 60
+        return self.__vertical_speed * 60 if self.__vertical_speed is not None else None
 
     @vertical_speed.setter
     def vertical_speed(self, value: float) -> None:
-        if value < 10000:
+        if value is not None and value < 10000:
             self.__vertical_speed = value
 
     @property
@@ -357,7 +357,7 @@ class TelemetrySample:
 
     @height.setter
     def height(self, value: float) -> None:
-        if value < 10000:
+        if value is not None and value < 10000:
             self.__height = value
 
     @property
@@ -366,7 +366,7 @@ class TelemetrySample:
 
     @elevation.setter
     def elevation(self, value: float) -> None:
-        if value < 100000:
+        if value is not None and value < 100000:
             self.__elevation = value
 
     @property

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Navigation2, Clock, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { getFlights, getFlightAlarms, getFlightTimeDuration } from '../api'
+import { getFlights, getFlightAlarms, getFlightTimeDuration, getFlightTelemetry } from '../api'
 import AlarmDonut from '../components/AlarmDonut'
-import FlightMap from '../components/FlightMap'
+import FlightMap, { TelemetryPoint } from '../components/FlightMap'
 import LoadingSpinner from '../components/LoadingSpinner'
 import StatCard from '../components/StatCard'
 import { alarmColor, alarmLabel } from '../constants/alarmColors'
@@ -45,6 +45,7 @@ export default function FlightAnalysisPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [alarms, setAlarms] = useState<Row[]>([])
   const [duration, setDuration] = useState<Row[]>([])
+  const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -60,10 +61,13 @@ export default function FlightAnalysisPage() {
     const id = Number(selected.id_volo ?? selected.id ?? 0)
     if (!id) return
     setDetailLoading(true)
-    Promise.all([getFlightAlarms(id), getFlightTimeDuration(id)])
-      .then(([al, dur]) => {
+    setTelemetry([])
+    Promise.all([getFlightAlarms(id), getFlightTimeDuration(id), getFlightTelemetry(id)])
+      .then(([al, dur, tel]) => {
         setAlarms(Array.isArray(al.data) ? al.data as Row[] : [])
         setDuration(Array.isArray(dur.data) ? dur.data as Row[] : [])
+        const telData = tel.data?.telemetry_alarms
+        setTelemetry(Array.isArray(telData) ? telData as TelemetryPoint[] : [])
       })
       .catch(() => {})
       .finally(() => setDetailLoading(false))
@@ -195,8 +199,11 @@ export default function FlightAnalysisPage() {
 
             {/* Map */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <p className="text-sm font-semibold text-gray-900 mb-3">Flight Path Map</p>
-              <FlightMap height={300} />
+              <p className="text-sm font-semibold text-gray-900 mb-1">Flight Path</p>
+              <p className="text-xs text-gray-400 mb-3">
+                Coloured by ML-predicted flight phase · {telemetry.length} telemetry points
+              </p>
+              <FlightMap telemetry={telemetry} height={400} />
             </div>
           </>
         )}

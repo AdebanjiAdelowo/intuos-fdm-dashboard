@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, Plane, AlertTriangle, Users } from 'lucide-react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts'
+import { Card, Title, Text, DonutChart, Legend, BarChart as TremorBar } from '@tremor/react'
 import {
   getRegistrationsWithFlightsCount,
   getPilotsWithFlightsCount,
@@ -10,12 +8,13 @@ import {
   getAllAlarms,
   AlarmSummary,
 } from '../api'
-import AlarmDonut from '../components/AlarmDonut'
 import StatCard from '../components/StatCard'
 import DateRangePicker from '../components/DateRangePicker'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useDateRange } from '../hooks/useDateRange'
 import { alarmColor, alarmLabel } from '../constants/alarmColors'
+
+const TREMOR_COLORS = ['blue','yellow','violet','orange','red','cyan','purple','green','pink','lime','indigo','rose']
 
 export default function FleetOverviewPage() {
   const { startDate, endDate, setStartDate, setEndDate } = useDateRange()
@@ -43,7 +42,6 @@ export default function FleetOverviewPage() {
       .finally(() => setLoading(false))
   }, [startDate, endDate])
 
-  // Sum all alarm types across all registrations for the donut
   const alarmTypeTotals: Record<string, number> = {}
   for (const row of allAlarms) {
     for (const [k, v] of Object.entries(row)) {
@@ -52,7 +50,7 @@ export default function FleetOverviewPage() {
     }
   }
   const donutData = Object.entries(alarmTypeTotals)
-    .map(([name, value]) => ({ name, value }))
+    .map(([name, value]) => ({ name: alarmLabel(name), value, key: name }))
     .sort((a, b) => b.value - a.value)
 
   const totalAlerts = donutData.reduce((s, d) => s + d.value, 0)
@@ -60,25 +58,19 @@ export default function FleetOverviewPage() {
 
   const barData = topAlarms
     .slice(0, 10)
-    .map((a) => ({ name: String(a.registration ?? '?').trim(), total: Number(a.total ?? 0) }))
+    .map((a) => ({ name: String(a.registration ?? '?').trim(), Alerts: Number(a.total ?? 0) }))
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-tremor-content-strong flex items-center gap-2">
             <Activity className="w-6 h-6" style={{ color: '#0d1f14' }} />
             Fleet Overview
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Fleet-wide alert distribution</p>
+          <Text className="mt-0.5">Fleet-wide alert distribution</Text>
         </div>
-        <DateRangePicker
-          startDate={startDate}
-          endDate={endDate}
-          onStartChange={setStartDate}
-          onEndChange={setEndDate}
-        />
+        <DateRangePicker startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} />
       </div>
 
       {loading ? (
@@ -95,62 +87,65 @@ export default function FleetOverviewPage() {
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Donut */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-900 mb-1">Alert Type Distribution</h2>
-              <p className="text-xs text-gray-400 mb-4">{totalAlerts.toLocaleString()} total alerts</p>
-              <AlarmDonut data={donutData} height={280} />
-            </div>
+            <Card>
+              <Title>Alert Type Distribution</Title>
+              <Text className="mt-1">{totalAlerts.toLocaleString()} total alerts</Text>
+              <DonutChart
+                data={donutData}
+                category="value"
+                index="name"
+                colors={TREMOR_COLORS}
+                valueFormatter={(v) => v.toLocaleString()}
+                className="h-60 mt-4"
+              />
+              <Legend
+                categories={donutData.slice(0, 6).map((d) => d.name)}
+                colors={TREMOR_COLORS.slice(0, 6)}
+                className="mt-4"
+              />
+            </Card>
 
-            {/* Bar */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-900 mb-1">Top Aircraft by Alerts</h2>
-              <p className="text-xs text-gray-400 mb-4">Top 10 registrations</p>
+            <Card>
+              <Title>Top Aircraft by Alerts</Title>
+              <Text className="mt-1">Top 10 registrations in range</Text>
               {barData.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-10">No data for this range</p>
+                <p className="text-sm text-tremor-content text-center py-10">No data for this range</p>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={barData} margin={{ top: 4, right: 16, bottom: 50, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                      {barData.map((_, i) => (
-                        <Cell key={i} fill={i === 0 ? '#b8f04a' : '#0d1f14'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <TremorBar
+                  data={barData}
+                  index="name"
+                  categories={['Alerts']}
+                  colors={['green']}
+                  valueFormatter={(v) => v.toLocaleString()}
+                  showLegend={false}
+                  className="h-60 mt-4"
+                />
               )}
-            </div>
+            </Card>
           </div>
 
-          {/* Alert breakdown table */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Alert Breakdown by Type</h2>
-            <div className="space-y-2">
-              {donutData.map(({ name, value }) => {
+          {/* Breakdown table */}
+          <Card>
+            <Title>Alert Breakdown by Type</Title>
+            <div className="mt-4 space-y-3">
+              {donutData.map(({ name, value, key }, i) => {
                 const pct = totalAlerts > 0 ? (value / totalAlerts) * 100 : 0
                 return (
                   <div key={name} className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: alarmColor(name) }} />
-                    <span className="text-sm text-gray-700 w-48 truncate">{alarmLabel(name)}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{ width: `${pct}%`, background: alarmColor(name) }}
-                      />
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: alarmColor(key) }} />
+                    <span className="text-sm text-tremor-content-emphasis w-52 truncate">{name}</span>
+                    <div className="flex-1 bg-tremor-background-subtle rounded-full h-2">
+                      <div className="h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: alarmColor(key) }} />
                     </div>
-                    <span className="text-sm font-medium text-gray-900 w-16 text-right">
+                    <span className="text-sm font-semibold text-tremor-content-strong w-16 text-right tabular-nums">
                       {value.toLocaleString()}
                     </span>
-                    <span className="text-xs text-gray-400 w-12 text-right">{pct.toFixed(1)}%</span>
+                    <span className="text-xs text-tremor-content w-12 text-right tabular-nums">{pct.toFixed(1)}%</span>
                   </div>
                 )
               })}
             </div>
-          </div>
+          </Card>
         </>
       )}
     </div>

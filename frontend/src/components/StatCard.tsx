@@ -1,3 +1,5 @@
+import { Card, Metric, Text } from '@tremor/react'
+
 interface Props {
   label: string
   value: string | number
@@ -8,7 +10,7 @@ interface Props {
 
 export default function StatCard({ label, value, sub, icon, accent }: Props) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 shadow-sm">
+    <Card className="flex items-center gap-4 p-5" decoration={accent ? 'left' : undefined} decorationColor="green">
       {icon && (
         <div
           className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
@@ -18,10 +20,10 @@ export default function StatCard({ label, value, sub, icon, accent }: Props) {
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide truncate">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+        <Text className="uppercase tracking-wide text-xs font-medium truncate">{label}</Text>
+        <Metric className="mt-0.5">{String(value)}</Metric>
+        {sub && <Text className="mt-0.5 text-xs">{sub}</Text>}
       </div>
-    </div>
+    </Card>
   )
 }

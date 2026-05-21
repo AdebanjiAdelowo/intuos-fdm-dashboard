@@ -1,27 +1,27 @@
 # INTUOS FDM — Flight Data Monitoring Dashboard
 
-A full-stack aviation safety analytics platform. FastAPI + IBM DB2 backend, React + Vite frontend with an INTUOS-style dark green theme.
+A full-stack aviation safety analytics platform. FastAPI + IBM DB2 backend, React + Vite frontend with an INTUOS-style dark green theme and Tremor component library.
 
 ## Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI · Python 3.9 · IBM DB2 (ibm_db) |
-| Frontend | React 18 · TypeScript · Vite · Tailwind CSS |
-| Charts | Recharts (bar, donut) |
+| Backend | FastAPI · Python 3.11 · IBM DB2 (`ibm_db 3.2.8`) |
+| Frontend | React 18 · TypeScript · Vite · Tailwind CSS · Tremor |
+| Charts | Tremor (DonutChart, BarChart) · Recharts (custom-colour charts) |
 | Maps | Leaflet (react-leaflet v4) |
 | Auth | JWT (HS256) |
-| Container | Docker Compose (backend + nginx frontend) |
+| Container | Docker Compose (backend + nginx frontend) · `linux/amd64` |
 
 ## Pages
 
 | Route | Page |
 |---|---|
-| `/` | Home — KPIs and quick-access links |
-| `/fleet` | Fleet Overview — alert distribution donut, top aircraft bar chart |
-| `/aircraft` | Aircraft Analysis — per-aircraft flights, alert breakdown, top alerting flights |
+| `/` | Home — KPI cards and top-registrations bar chart |
+| `/fleet` | Fleet Overview — alert distribution donut, top aircraft bar chart, breakdown table |
+| `/aircraft` | Aircraft Analysis — per-aircraft flights, alert breakdown, top alerting flights, flight map |
 | `/flights` | Flight Analysis — all flights with route/duration, per-flight alert detail |
-| `/pilots` | Pilot Analysis — searchable pilot list, alert breakdown, top flights |
+| `/pilots` | Pilot Analysis — searchable/paginated pilot list, alarm breakdown, recent flights |
 | `/instructors` | Instructor Analysis — same as pilot view, filtered by role |
 
 ## Quick start (Docker Compose)
@@ -36,6 +36,8 @@ docker compose up --build
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:5001 |
 | API docs | http://localhost:5001/docs |
+
+> **Apple Silicon (M-series) note:** The backend image is built for `linux/amd64` (set in both the `Dockerfile` `FROM` line and `docker-compose.yml`). Docker Desktop runs it under Rosetta. This is required because `ibm_db` has no `linux/arm64` wheel.
 
 ## Development
 
@@ -58,10 +60,6 @@ npm run dev        # http://localhost:3000
 ```
 
 The Vite dev server proxies `/api/*` to `http://localhost:5001`.
-
-## Dev login bypass
-
-Set `DEV_BYPASS_LOGIN=true` in `docker-compose.yml` (already enabled by default) to skip IBM DB2 auth on every request. The `/login` endpoint still issues a JWT; all other endpoints skip the per-user DB lookup and use the `database_user` section from `config.yml` directly.
 
 ## Configuration
 
@@ -98,6 +96,10 @@ DEV_BYPASS_LOGIN="false"
 ```
 
 `config.yml`, `.env`, and runtime secrets are intentionally excluded from git.
+
+## API endpoints
+
+A full list of all 44 endpoints is documented in [ENDPOINTS.md](ENDPOINTS.md).
 
 ## Alert colour scheme
 

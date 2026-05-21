@@ -1,0 +1,9 @@
+[
+  "acc_x",
+  "pitch",
+  "roll",
+  "turn_rate",
+  "magnetic_heading",
+  "ground_speed",
+  "vertical_speed"
+]

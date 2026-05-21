@@ -7,9 +7,12 @@ services:
       - "3000:80"
     depends_on:
       - backend
+    networks:
+      - app-net
 
   backend:
-    build: ./
+    build:
+      context: ./
     platform: linux/amd64
     ports:
       - "5001:5001"
@@ -19,9 +22,14 @@ services:
       PYTHONUNBUFFERED: 1
       DEV_BYPASS_LOGIN: "true"
     volumes:
-      # Local development fallback. Prefer DATABASE_* values in .env for deployments.
       - ./config.yml:/app/config.yml:ro
-      - .:/app  # Mount source for auto-reload
-      - /app/__pycache__  # Exclude pycache
+      - .:/app
+      - /app/__pycache__
     command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5001", "--reload"]
     restart: unless-stopped
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge

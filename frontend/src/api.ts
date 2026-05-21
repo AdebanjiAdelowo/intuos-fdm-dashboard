@@ -135,7 +135,7 @@ export const getFlightTimeDuration = (id: number) =>
   req<{ data: unknown[] }>(`/flight/${id}/time_duration`)
 
 export const getFlightTelemetry = (id: number) =>
-  req<{ data: unknown[] }>(`/telemetry/flight/${id}`)
+  req<{ data: { telemetry_alarms: unknown[]; flight_info: unknown } }>(`/telemetry/flight/${id}`)
 
 // ─── Alarms / Telemetry ───────────────────────────────────────────────────────
 

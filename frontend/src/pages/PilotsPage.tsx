@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Users } from 'lucide-react'
+import { Card, Title, Text, TextInput, Button } from '@tremor/react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -97,18 +98,21 @@ export default function PilotsPage() {
       <div className="p-6 max-w-7xl mx-auto">
         <button
           onClick={() => setSelected(null)}
-          className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-800 mb-4"
+          className="flex items-center gap-1.5 text-sm font-medium mb-5 hover:opacity-70 transition-opacity"
+          style={{ color: '#0d1f14' }}
         >
           <ChevronLeft className="w-4 h-4" /> Back to pilots
         </button>
 
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Users className="w-6 h-6 text-brand-600" />
-              {pilotName}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Pilot detail · ID {pilotId}</p>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#0d1f14' }}>
+              <Users className="w-5 h-5" style={{ color: '#b8f04a' }} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-tremor-content-strong">{pilotName}</h1>
+              <Text className="mt-0.5">Pilot detail · ID {pilotId}</Text>
+            </div>
           </div>
           <DateRangePicker
             startDate={startDate}
@@ -132,8 +136,8 @@ export default function PilotsPage() {
             </div>
 
             {alarmChartData.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
-                <h2 className="text-base font-semibold text-gray-900 mb-4">Alarm Breakdown</h2>
+              <Card className="mb-6">
+                <Title>Alarm Breakdown</Title>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={alarmChartData} margin={{ top: 4, right: 16, bottom: 60, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -143,11 +147,11 @@ export default function PilotsPage() {
                     <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </Card>
             )}
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Recent Flights</h2>
+            <Card>
+              <Title>Recent Flights</Title>
               <DataTable
                 columns={[
                   { key: 'id_volo', label: 'Flight ID' },
@@ -157,7 +161,7 @@ export default function PilotsPage() {
                 data={flights.slice(0, 50)}
                 emptyMessage="No flights in this date range."
               />
-            </div>
+            </Card>
           </>
         )}
       </div>
@@ -168,8 +172,8 @@ export default function PilotsPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pilots</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{totalItems} pilots in range</p>
+          <h1 className="text-2xl font-bold text-tremor-content-strong">Pilots</h1>
+          <Text className="mt-0.5">{totalItems} pilots in range</Text>
         </div>
         <DateRangePicker
           startDate={startDate}
@@ -179,25 +183,22 @@ export default function PilotsPage() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={inputVal}
-              onChange={(e) => setInputVal(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { setSearch(inputVal); setPage(1) } }}
-              placeholder="Search by name…"
-              className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-sm w-full focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-          <button
+      <Card className="p-0 overflow-hidden">
+        <div className="px-5 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid #e5e7eb' }}>
+          <TextInput
+            placeholder="Search by name…"
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setSearch(inputVal); setPage(1) } }}
+            className="max-w-xs"
+          />
+          <Button
+            size="sm"
             onClick={() => { setSearch(inputVal); setPage(1) }}
-            className="bg-brand-600 hover:bg-brand-700 text-white text-sm px-3 py-1.5 rounded-md"
+            style={{ background: '#0d1f14', color: '#b8f04a', border: 'none' }}
           >
             Search
-          </button>
+          </Button>
         </div>
 
         {loading ? (
@@ -215,20 +216,20 @@ export default function PilotsPage() {
               onRowClick={(row) => setSelected(row)}
               emptyMessage="No pilots found."
             />
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-600">
-              <span>Page {page} of {totalPages} ({totalItems} total)</span>
-              <div className="flex gap-2">
+            <div className="px-5 py-3 flex items-center justify-between text-sm text-tremor-content" style={{ borderTop: '1px solid #e5e7eb' }}>
+              <Text>Page {page} of {totalPages} · {totalItems} total</Text>
+              <div className="flex gap-1">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+                  className="p-1.5 rounded-tremor-small hover:bg-tremor-background-subtle disabled:opacity-40 transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+                  className="p-1.5 rounded-tremor-small hover:bg-tremor-background-subtle disabled:opacity-40 transition-colors"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -236,7 +237,7 @@ export default function PilotsPage() {
             </div>
           </>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

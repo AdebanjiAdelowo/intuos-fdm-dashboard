@@ -3,5 +3,15 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  background: #f8fafc;
+  color: #111827;
+}
+
+/* Card utility used in pages not yet fully migrated to Tremor <Card> */
+.tremor-card-wrap {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+  padding: 1.25rem;
 }

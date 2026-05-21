@@ -1,4 +1,6 @@
 import asyncio
+import json
+import math
 import os
 from datetime import datetime
 from typing import List
@@ -8,6 +10,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+
+def _clean(obj):
+    """Recursively replace NaN/Inf floats with None so JSON serialisation never fails."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _clean(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_clean(v) for v in obj]
+    return obj
+
+
+class SafeJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(_clean(content), ensure_ascii=False, separators=(',', ':')).encode('utf-8')
 
 
 class RegistrationIdsBody(BaseModel):
@@ -140,15 +158,15 @@ async def login(request: Request, connection: ConnectionParamsHandler = Depends(
     if os.getenv("DEV_BYPASS_LOGIN", "false").lower() == "true":
         from controllers.login import generate_token
         token = generate_token(email)
-        return JSONResponse(
+        return SafeJSONResponse(
             status_code=200, 
             content={"data": {"user": {"email": email}, "token": token}}
         )
     
     user, token = do_login(connection=connection,email=email,password=password,)
     if (user is None) or (token is None):
-        return JSONResponse(status_code=401, content={"message": "Invalid credentials"})
-    return JSONResponse(
+        return SafeJSONResponse(status_code=401, content={"message": "Invalid credentials"})
+    return SafeJSONResponse(
         status_code=200, content={"data": {"user": user, "token": token}}
     )
 
@@ -164,12 +182,12 @@ async def get_flights(request: Request, connection: ConnectionParamsHandler = De
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights = await asyncio.to_thread(get_all_flights, connection) 
     if flights:
-        return JSONResponse(status_code=200, content={"data": flights})
+        return SafeJSONResponse(status_code=200, content={"data": flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 @app.get("/flight/{id}/time_duration")
@@ -186,12 +204,12 @@ async def get_flight_timeduration(id: int, request: Request, connection: Connect
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flight_duration = await asyncio.to_thread(get_flight_time_duration, connection, id)
     if len(flight_duration) > 0:
-        return JSONResponse(status_code=200, content={"data": flight_duration})
+        return SafeJSONResponse(status_code=200, content={"data": flight_duration})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
     
 @app.get("/telemetry/flight/{id}")
@@ -208,12 +226,12 @@ async def get_flight_telemetry(id: int, request: Request, connection: Connection
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flight_telemetry = await asyncio.to_thread(get_flight_telemetry_with_alarms_and_labels, connection, id)
     if len(flight_telemetry) > 0:
-        return JSONResponse(status_code=200, content={"data": flight_telemetry})
+        return SafeJSONResponse(status_code=200, content={"data": flight_telemetry})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 @app.get("/registrations_with_flights")
@@ -227,12 +245,12 @@ async def get_registrations_with_flights(request: Request, connection: Connectio
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     registrations = await asyncio.to_thread(get_all_registrations_with_flights, connection)
     if len(registrations) > 0:
-        return JSONResponse(status_code=200, content={"data": registrations})
+        return SafeJSONResponse(status_code=200, content={"data": registrations})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/pilots_with_flights")
 async def get_pilots_with_flights(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -245,12 +263,12 @@ async def get_pilots_with_flights(request: Request, connection: ConnectionParams
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     pilots = await asyncio.to_thread(get_all_pilots_with_flights, connection)
     if len(pilots) > 0:
-        return JSONResponse(status_code=200, content={"data": pilots})
+        return SafeJSONResponse(status_code=200, content={"data": pilots})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})  
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})  
           
 @app.get("/all_registrations")
 async def get_registrations(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -263,12 +281,12 @@ async def get_registrations(request: Request, connection: ConnectionParamsHandle
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     registrations = await asyncio.to_thread(get_all_registrations, connection)
     if len(registrations) > 0:
-        return JSONResponse(status_code=200, content={"data": registrations})
+        return SafeJSONResponse(status_code=200, content={"data": registrations})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 @app.get("/all_pilots")
@@ -282,12 +300,12 @@ async def get_pilots(request: Request, connection: ConnectionParamsHandler = Dep
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     pilots = await asyncio.to_thread(get_all_pilots, connection)
     if len(pilots) > 0:
-        return JSONResponse(status_code=200, content={"data": pilots})
+        return SafeJSONResponse(status_code=200, content={"data": pilots})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 @app.get("/all_pilots_pg/{start_date}/{end_date}")
 async def get_pilots_pg(
@@ -313,7 +331,7 @@ async def get_pilots_pg(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     pilots, total_count = await asyncio.to_thread(
         get_paginated_pilots, 
@@ -326,10 +344,10 @@ async def get_pilots_pg(
     
     if not pilots:
         if total_count == 0:
-            return JSONResponse(status_code=204, content={"message": "no data"})
+            return SafeJSONResponse(status_code=204, content={"message": "no data"})
         else:
             # This might happen if the page number is beyond available data
-            return JSONResponse(status_code=200, content={
+            return SafeJSONResponse(status_code=200, content={
                 "data": [],
                 "pagination": {
                     "page": page,
@@ -345,7 +363,7 @@ async def get_pilots_pg(
     total_pages = (total_count + page_size - 1) // page_size  # Ceiling division
     total_pages = int(total_pages)
     total_count = int(total_count)
-    return JSONResponse(
+    return SafeJSONResponse(
         status_code=200, 
         content={
             "data": pilots,
@@ -387,7 +405,7 @@ async def get_pilots_search(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     pilots, total_count = await asyncio.to_thread(
         search_pilots, 
@@ -401,10 +419,10 @@ async def get_pilots_search(
     
     if not pilots:
         if total_count == 0:
-            return JSONResponse(status_code=204, content={"message": "no data"})
+            return SafeJSONResponse(status_code=204, content={"message": "no data"})
         else:
             # This might happen if the page number is beyond available data
-            return JSONResponse(status_code=200, content={
+            return SafeJSONResponse(status_code=200, content={
                 "data": [],
                 "pagination": {
                     "page": page,
@@ -423,7 +441,7 @@ async def get_pilots_search(
     total_pages = int(total_pages)
     total_count = int(total_count)
     
-    return JSONResponse(
+    return SafeJSONResponse(
         status_code=200, 
         content={
             "data": pilots,
@@ -451,13 +469,13 @@ async def get_registrations_count(request: Request, connection: ConnectionParams
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     try:
         registrations_count = await asyncio.to_thread(get_all_registrations_count, connection)
-        return JSONResponse(status_code=200, content={"data": int(registrations_count)})
+        return SafeJSONResponse(status_code=200, content={"data": int(registrations_count)})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": str(e)})
+        return SafeJSONResponse(status_code=500, content={"message": str(e)})
     
 @app.get("/all_pilots_count")
 async def get_pilots_count(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -470,13 +488,13 @@ async def get_pilots_count(request: Request, connection: ConnectionParamsHandler
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     try:
         pilots_count = await asyncio.to_thread(get_all_pilots_count, connection)
-        return JSONResponse(status_code=200, content={"data": int(pilots_count)})
+        return SafeJSONResponse(status_code=200, content={"data": int(pilots_count)})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": str(e)})
+        return SafeJSONResponse(status_code=500, content={"message": str(e)})
     
 @app.get("/registrations_with_flights_count")
 async def get_registrations_with_flights_count(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -489,13 +507,13 @@ async def get_registrations_with_flights_count(request: Request, connection: Con
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     try:
         registrations_count = await asyncio.to_thread(get_all_registrations_with_flights_count, connection)
-        return JSONResponse(status_code=200, content={"data": int(registrations_count)})
+        return SafeJSONResponse(status_code=200, content={"data": int(registrations_count)})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": str(e)})
+        return SafeJSONResponse(status_code=500, content={"message": str(e)})
     
 @app.get("/pilots_with_flights_count")
 async def get_pilots_with_flights_count(request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -508,13 +526,13 @@ async def get_pilots_with_flights_count(request: Request, connection: Connection
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     try:
         pilots_count = await asyncio.to_thread(get_all_pilots_with_flights_count, connection)
-        return JSONResponse(status_code=200, content={"data": int(pilots_count)})
+        return SafeJSONResponse(status_code=200, content={"data": int(pilots_count)})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"message": str(e)})
+        return SafeJSONResponse(status_code=500, content={"message": str(e)})
           
 @app.get("/registrations/alarms/{start_date}/{end_date}")
 async def get_alarms(start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -533,13 +551,13 @@ async def get_alarms(start_date: str, end_date: str, request: Request, connectio
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)}) 
+        return SafeJSONResponse(status_code=401, content={"message": str(e)}) 
     recent_alarms = await asyncio.to_thread(get_all_recent_alarms_pre, connection, start_date, end_date)
 
     if len(recent_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": recent_alarms})
+        return SafeJSONResponse(status_code=200, content={"data": recent_alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
         
 @app.get("/top_registrations/alarms/{top}/{start_date}/{end_date}")
 async def get_top_registrations_by_alarms(top: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -558,13 +576,13 @@ async def get_top_registrations_by_alarms(top: str, start_date: str, end_date: s
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     recent_alarms = await asyncio.to_thread(get_all_recent_alarms_pre, connection, start_date, end_date)
 
     if len(recent_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": recent_alarms[:int(top)]})
+        return SafeJSONResponse(status_code=200, content={"data": recent_alarms[:int(top)]})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 
 @app.get("/registration/{registration_id}/flights")
@@ -581,12 +599,12 @@ async def get_flights_by_registration(registration_id: str, request: Request, co
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights = await asyncio.to_thread(get_all_registration_flights, connection, registration_id)
     if len(flights) > 0:
-        return JSONResponse(status_code=200, content={"data": flights})
+        return SafeJSONResponse(status_code=200, content={"data": flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/pilot/{pilot_id}/flights")
 async def get_flights_by_pilot(pilot_id: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -602,12 +620,12 @@ async def get_flights_by_pilot(pilot_id: str, request: Request, connection: Conn
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights = await asyncio.to_thread(get_all_pilot_flights, connection, pilot_id) 
     if len(flights) > 0:
-        return JSONResponse(status_code=200, content={"data": flights})
+        return SafeJSONResponse(status_code=200, content={"data": flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 @app.get("/registration/{registration_id}/flights/{start_date}/{end_date}")
 async def get_flights_by_registration_and_date(
@@ -629,16 +647,16 @@ async def get_flights_by_registration_and_date(
     try:    
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights = await asyncio.to_thread(get_flights_by_registration_id_and_date, 
                                         connection, 
                                         registration_id,
                                         start_date,
                                         end_date)
     if len(flights) > 0:
-        return JSONResponse(status_code=200, content={"data": flights})
+        return SafeJSONResponse(status_code=200, content={"data": flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/pilot/{pilot_id}/flights/{start_date}/{end_date}")
 async def get_flights_by_pilot_and_date(
@@ -660,16 +678,16 @@ async def get_flights_by_pilot_and_date(
     try:    
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights = await asyncio.to_thread(get_flights_by_pilot_id_and_date, 
                                         connection, 
                                         pilot_id,
                                         start_date,
                                         end_date)
     if len(flights) > 0:
-        return JSONResponse(status_code=200, content={"data": flights})
+        return SafeJSONResponse(status_code=200, content={"data": flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 @app.get("/flewhours/pilot/{pilot_id}/flights/{start_date}/{end_date}")
 async def get_total_flewhourmins_by_pilot_and_date(
@@ -691,7 +709,7 @@ async def get_total_flewhourmins_by_pilot_and_date(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     flewhoursmins = await asyncio.to_thread(get_total_flewhourmin_by_pilot_id_and_date,
                                             connection,
@@ -700,9 +718,9 @@ async def get_total_flewhourmins_by_pilot_and_date(
                                             end_date
                                             )
     if len(flewhoursmins) > 0:
-        return JSONResponse(status_code=200, content={"data": flewhoursmins})
+        return SafeJSONResponse(status_code=200, content={"data": flewhoursmins})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/flewhours/registration/{registration_id}/flights/{start_date}/{end_date}")
 async def get_total_flewhourmins_by_registration_and_date(
@@ -724,7 +742,7 @@ async def get_total_flewhourmins_by_registration_and_date(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     flewhoursmins = await asyncio.to_thread(get_total_flewhourmin_by_registration_id_and_date,
                                             connection,
@@ -733,9 +751,9 @@ async def get_total_flewhourmins_by_registration_and_date(
                                             end_date
                                             )
     if len(flewhoursmins) > 0:
-        return JSONResponse(status_code=200, content={"data": flewhoursmins})
+        return SafeJSONResponse(status_code=200, content={"data": flewhoursmins})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.post("/registration/flights/{start_date}/{end_date}")
 async def get_flights_by_registrations_and_date(
@@ -759,7 +777,7 @@ async def get_flights_by_registrations_and_date(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     all_flights = await asyncio.to_thread(get_flights_by_registration_ids_and_date,
                                             connection,
@@ -767,9 +785,9 @@ async def get_flights_by_registrations_and_date(
                                             start_date,
                                             end_date)
     if len(all_flights) > 0:
-        return JSONResponse(status_code=200, content={"data": all_flights})
+        return SafeJSONResponse(status_code=200, content={"data": all_flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.post("/pilot/flights/{start_date}/{end_date}")
 async def get_flights_by_pilots_and_date(
@@ -793,7 +811,7 @@ async def get_flights_by_pilots_and_date(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     all_flights = await asyncio.to_thread(get_flights_by_pilot_ids_and_date,
                                             connection,
@@ -801,9 +819,9 @@ async def get_flights_by_pilots_and_date(
                                             start_date,
                                             end_date)
     if len(all_flights) > 0:
-        return JSONResponse(status_code=200, content={"data": all_flights})
+        return SafeJSONResponse(status_code=200, content={"data": all_flights})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
     
 @app.get("/registration/{registration_id}/telemetry/{start_date}/{end_date}")
@@ -827,7 +845,7 @@ async def get_flight_telemetry_by_registration(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     registration_ids = [registration_id]
     flight_telemetry = await asyncio.to_thread(get_flight_telemetry_by_date_range_pre,
                                                 connection,
@@ -835,9 +853,9 @@ async def get_flight_telemetry_by_registration(
                                                 start_date,
                                                 end_date)
     if len(flight_telemetry) > 0:
-        return JSONResponse(status_code=200, content={"data": flight_telemetry})
+        return SafeJSONResponse(status_code=200, content={"data": flight_telemetry})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/pilot/{pilot_id}/telemetry/{start_date}/{end_date}")
 async def get_flight_telemetry_by_pilot(
@@ -860,7 +878,7 @@ async def get_flight_telemetry_by_pilot(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     pilot_ids = [pilot_id]
     flight_telemetry = await asyncio.to_thread(get_flight_telemetry_by_pilots_date_range,
                                                 connection,
@@ -868,9 +886,9 @@ async def get_flight_telemetry_by_pilot(
                                                 start_date,
                                                 end_date)
     if len(flight_telemetry) > 0:
-        return JSONResponse(status_code=200, content={"data": flight_telemetry})
+        return SafeJSONResponse(status_code=200, content={"data": flight_telemetry})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.post("/registration/telemetry/{start_date}/{end_date}")
 async def get_flight_telemetry_by_registrations(
@@ -894,7 +912,7 @@ async def get_flight_telemetry_by_registrations(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_date_range_pre,
                                             connection,
@@ -902,9 +920,9 @@ async def get_flight_telemetry_by_registrations(
                                             start_date,
                                             end_date)
     if len(all_telemetries) > 0:
-        return JSONResponse(status_code=200, content={"data": all_telemetries})
+        return SafeJSONResponse(status_code=200, content={"data": all_telemetries})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 
 @app.post("/pilot/telemetry/{start_date}/{end_date}")
@@ -929,7 +947,7 @@ async def get_flight_telemetry_by_pilots(
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     all_telemetries = await asyncio.to_thread(get_flight_telemetry_by_pilots_date_range,
                                             connection,
@@ -937,9 +955,9 @@ async def get_flight_telemetry_by_pilots(
                                             start_date,
                                             end_date)
     if len(all_telemetries) > 0:
-        return JSONResponse(status_code=200, content={"data": all_telemetries})
+        return SafeJSONResponse(status_code=200, content={"data": all_telemetries})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 @app.get("/registration/{registration_id}/alarms")
@@ -956,12 +974,12 @@ async def get_alarms_by_registration(registration_id: str, request: Request, con
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     alarms = await asyncio.to_thread(get_alarms_by_registration_id, connection, registration_id)
     if len(alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": alarms})
+        return SafeJSONResponse(status_code=200, content={"data": alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
     
 @app.get("/pilot/{pilot_id}/alarms")
@@ -978,12 +996,12 @@ async def get_alarms_by_pilot(pilot_id: str, request: Request, connection: Conne
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     alarms = await asyncio.to_thread(get_alarms_by_pilot_id, connection, pilot_id)
     if len(alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": alarms})
+        return SafeJSONResponse(status_code=200, content={"data": alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
    
     
 @app.get("/registration/{registration_id}/alarms/{start_date}/{end_date}")
@@ -1002,7 +1020,7 @@ async def get_all_recent_alarms_by_registration(registration_id: str, start_date
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     alarms = await asyncio.to_thread(get_all_recent_alarms_by_registration_id,
                                     connection,
@@ -1010,9 +1028,9 @@ async def get_all_recent_alarms_by_registration(registration_id: str, start_date
                                     start_date,
                                     end_date)
     if len(alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": alarms})
+        return SafeJSONResponse(status_code=200, content={"data": alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
     
 
@@ -1032,7 +1050,7 @@ async def get_all_recent_alarms_by_pilot(pilot_id: str, start_date: str, end_dat
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     alarms = await asyncio.to_thread(get_all_recent_alarms_by_pilot_id,
                                     connection,
@@ -1040,9 +1058,9 @@ async def get_all_recent_alarms_by_pilot(pilot_id: str, start_date: str, end_dat
                                     start_date,
                                     end_date)
     if len(alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": alarms})
+        return SafeJSONResponse(status_code=200, content={"data": alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 @app.get("/registration/{registration_id}/{top}/alarms/{start_date}/{end_date}")
@@ -1061,7 +1079,7 @@ async def get_top_recent_alarms_by_registration(registration_id: str, top: str, 
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     top_alarms = await asyncio.to_thread(get_all_top_recent_alarms_by_registration_id,
                                         connection,
@@ -1070,9 +1088,9 @@ async def get_top_recent_alarms_by_registration(registration_id: str, top: str, 
                                         start_date,
                                         end_date)
     if len(top_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": top_alarms})
+        return SafeJSONResponse(status_code=200, content={"data": top_alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/pilot/{pilot_id}/{top}/alarms/{start_date}/{end_date}")
 async def get_top_recent_alarms_by_pilot(pilot_id: str, top: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1090,7 +1108,7 @@ async def get_top_recent_alarms_by_pilot(pilot_id: str, top: str, start_date: st
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     top_alarms = await asyncio.to_thread(get_all_top_recent_alarms_by_pilot_id,
                                         connection,
@@ -1099,9 +1117,9 @@ async def get_top_recent_alarms_by_pilot(pilot_id: str, top: str, start_date: st
                                         start_date,
                                         end_date)
     if len(top_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": top_alarms})
+        return SafeJSONResponse(status_code=200, content={"data": top_alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})    
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})    
     
 @app.get("/registration/{registration_id}/flightswithalarms/{start_date}/{end_date}")
 async def get_flight_with_alarms_by_registration(registration_id: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1120,16 +1138,16 @@ async def get_flight_with_alarms_by_registration(registration_id: str, start_dat
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights_with_alarms_count = await asyncio.to_thread(get_flightswithalarms_by_registration_id,
                                                         connection,
                                                         registration_id,
                                                         start_date,
                                                         end_date)
     if len(flights_with_alarms_count) > 0:
-        return JSONResponse(status_code=200, content={"data": flights_with_alarms_count[0]})
+        return SafeJSONResponse(status_code=200, content={"data": flights_with_alarms_count[0]})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 @app.get("/pilot/{pilot_id}/flightswithalarms/{start_date}/{end_date}")
 async def get_flight_with_alarms_by_pilot(pilot_id: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1148,16 +1166,16 @@ async def get_flight_with_alarms_by_pilot(pilot_id: str, start_date: str, end_da
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights_with_alarms_count = await asyncio.to_thread(get_flightswithalarms_by_pilot_id,
                                                         connection,
                                                         pilot_id,
                                                         start_date,
                                                         end_date)
     if len(flights_with_alarms_count) > 0:
-        return JSONResponse(status_code=200, content={"data": flights_with_alarms_count[0]})
+        return SafeJSONResponse(status_code=200, content={"data": flights_with_alarms_count[0]})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 @app.get("/registration/{registration_id}/top_flightswithalarms/{top}/{start_date}/{end_date}")
 async def get_top_flight_with_alarms_by_registration(registration_id: str, top: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1175,7 +1193,7 @@ async def get_top_flight_with_alarms_by_registration(registration_id: str, top: 
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights_with_alarms = await asyncio.to_thread(get_top_flightswithalarms_by_registration_id,
                                                 connection,
                                                 registration_id,
@@ -1183,9 +1201,9 @@ async def get_top_flight_with_alarms_by_registration(registration_id: str, top: 
                                                 start_date,
                                                 end_date)
     if len(flights_with_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": flights_with_alarms})
+        return SafeJSONResponse(status_code=200, content={"data": flights_with_alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/pilot/{pilot_id}/top_flightswithalarms/{top}/{start_date}/{end_date}")
 async def get_top_flight_with_alarms_by_pilot(pilot_id: str, top: str, start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1203,7 +1221,7 @@ async def get_top_flight_with_alarms_by_pilot(pilot_id: str, top: str, start_dat
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     flights_with_alarms = await asyncio.to_thread(get_top_flightswithalarms_by_pilot_id,
                                                         connection,
                                                         pilot_id,
@@ -1211,9 +1229,9 @@ async def get_top_flight_with_alarms_by_pilot(pilot_id: str, top: str, start_dat
                                                         start_date,
                                                         end_date)
     if len(flights_with_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": flights_with_alarms})
+        return SafeJSONResponse(status_code=200, content={"data": flights_with_alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
 @app.get("/alarms/flight/{id}")
 async def get_flight_alarms_by_flight(id: int, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1229,12 +1247,12 @@ async def get_flight_alarms_by_flight(id: int, request: Request, connection: Con
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     alarms = await asyncio.to_thread(get_flight_alarms_by_flight_id, connection, id)
     if len(alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": alarms})
+        return SafeJSONResponse(status_code=200, content={"data": alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
     
     
 @app.get("/alarms/flight/{id}/{top}")
@@ -1251,12 +1269,12 @@ async def get_top_flight_alarms_by_flight(id: int, top:int, request: Request, co
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     top_alarms = await asyncio.to_thread(get_top_flight_alarms_by_flight_id, connection, id, top)
     if len(top_alarms) > 0:
-        return JSONResponse(status_code=200, content={"data": top_alarms})
+        return SafeJSONResponse(status_code=200, content={"data": top_alarms})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 @app.get("/registrations/alarms/telemetry/{start_date}/{end_date}")
 async def get_alarms_by_telemetry(start_date: str, end_date: str, request: Request, connection: ConnectionParamsHandler = Depends(get_connection)):
@@ -1275,15 +1293,15 @@ async def get_alarms_by_telemetry(start_date: str, end_date: str, request: Reque
     try:
         connection = await asyncio.to_thread(retrieve_connection_params, request, connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
     
     alarm_telemetry = await asyncio.to_thread(get_all_recent_alarms_telemetry_pre, connection, start_date, end_date)
 
 
     if len(alarm_telemetry) > 0:
-        return JSONResponse(status_code=200, content={"data": alarm_telemetry})
+        return SafeJSONResponse(status_code=200, content={"data": alarm_telemetry})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 @app.post("/registration/alarms/telemetry/{start_date}/{end_date}")
@@ -1306,7 +1324,7 @@ async def get_alarms_by_registration_telemetry(start_date: str, end_date: str, b
     try:
         connection = retrieve_connection_params(request=request, connection=connection)
     except Exception as e:
-        return JSONResponse(status_code=401, content={"message": str(e)})
+        return SafeJSONResponse(status_code=401, content={"message": str(e)})
 
     alarm_telemetries = await asyncio.to_thread(get_all_recent_alarms_telemetry_by_id_pre,
                                                 connection,
@@ -1314,9 +1332,9 @@ async def get_alarms_by_registration_telemetry(start_date: str, end_date: str, b
                                                 end_date,
                                                 body.registration_ids)
     if len(alarm_telemetries) > 0:
-        return JSONResponse(status_code=200, content={"data": alarm_telemetries})
+        return SafeJSONResponse(status_code=200, content={"data": alarm_telemetries})
     else:
-        return JSONResponse(status_code=204, content={"message": "no data"})
+        return SafeJSONResponse(status_code=204, content={"message": "no data"})
 
 
 def main():

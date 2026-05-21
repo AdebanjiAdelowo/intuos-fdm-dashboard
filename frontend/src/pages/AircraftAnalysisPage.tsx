@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Plane, AlertTriangle, Clock, Navigation2 } from 'lucide-react'
+import { Card, Title, Text, Badge } from '@tremor/react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
   getRegistrationsWithFlights,
@@ -145,7 +146,7 @@ export default function AircraftAnalysisPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">{regId}</h1>
+                <h1 className="text-2xl font-bold text-tremor-content-strong">{regId}</h1>
                 {model && (
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{model}</span>
                 )}
@@ -172,12 +173,12 @@ export default function AircraftAnalysisPage() {
             {/* Charts row */}
             {alarmEntries.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <div className="tremor-card-wrap">
                   <p className="text-sm font-semibold text-gray-900">Alert Distribution</p>
                   <p className="text-xs text-gray-400 mb-3">{totalAlarms.toLocaleString()} total alerts</p>
                   <AlarmDonut data={alarmEntries} height={260} />
                 </div>
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <div className="tremor-card-wrap">
                   <p className="text-sm font-semibold text-gray-900 mb-4">Alert Breakdown</p>
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 116 }}>
@@ -196,7 +197,7 @@ export default function AircraftAnalysisPage() {
 
             {/* Alarm breakdown detail */}
             {alarmEntries.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+              <div className="tremor-card-wrap mb-6">
                 <p className="text-sm font-semibold text-gray-900 mb-4">Alert Type Detail</p>
                 <AlarmBreakdown entries={alarmEntries} total={totalAlarms} />
               </div>
@@ -204,7 +205,7 @@ export default function AircraftAnalysisPage() {
 
             {/* Top alerting flights */}
             {topFlights.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+              <div className="tremor-card-wrap mb-6">
                 <p className="text-sm font-semibold text-gray-900 mb-1">Top Alerting Flights</p>
                 <p className="text-xs text-gray-400 mb-4">Flights with the highest alert counts in this range</p>
                 <div className="overflow-x-auto">
@@ -246,13 +247,13 @@ export default function AircraftAnalysisPage() {
             )}
 
             {/* Map */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+            <div className="tremor-card-wrap mb-6">
               <p className="text-sm font-semibold text-gray-900 mb-3">Flight Path Map</p>
               <FlightMap height={300} />
             </div>
 
             {/* Flights table */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <div className="tremor-card-wrap">
               <p className="text-sm font-semibold text-gray-900 mb-1">All Flights</p>
               <p className="text-xs text-gray-400 mb-4">{flightsTotal} flights in selected range</p>
               <DataTable
@@ -305,8 +306,8 @@ export default function AircraftAnalysisPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Aircraft Analysis</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Select an aircraft to analyse its flights and alerts</p>
+          <h1 className="text-2xl font-bold text-tremor-content-strong">Aircraft Analysis</h1>
+          <p className="text-sm text-tremor-content mt-0.5">Select an aircraft to analyse its flights and alerts</p>
         </div>
       </div>
 
@@ -314,7 +315,7 @@ export default function AircraftAnalysisPage() {
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="tremor-card-wrap">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700">{registrations.length} aircraft</span>
           <span className="text-xs text-gray-400">Click a row to analyse</span>
