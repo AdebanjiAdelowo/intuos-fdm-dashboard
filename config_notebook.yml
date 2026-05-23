@@ -1,0 +1,13 @@
+database:
+  username: 'REDACTED_DB2_USER'
+  password: 'REDACTED_DB2_PASSWORD'
+  ip_address: 'REDACTED_DB2_HOST'
+  port: '27010'
+  db_name: 'DB_SUN01'
+  
+database_user:
+  username: 'REDACTED_DB2_USER'
+  password: 'REDACTED_DB2_PASSWORD'
+  ip_address: 'REDACTED_DB2_HOST'
+  port: '27010'
+  db_name: 'DB_CMM'
