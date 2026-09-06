@@ -1,4 +1,4 @@
-# INTUOS FDM — Flight Data Monitoring Dashboard
+# INTUOS FDM: Flight Data Monitoring Dashboard
 
 A full-stack aviation safety analytics platform. FastAPI + IBM DB2 backend, React + Vite frontend with an INTUOS-style dark green theme and Tremor component library.
 
@@ -17,12 +17,12 @@ A full-stack aviation safety analytics platform. FastAPI + IBM DB2 backend, Reac
 
 | Route | Page |
 |---|---|
-| `/` | Home — KPI cards and top-registrations bar chart |
-| `/fleet` | Fleet Overview — alert distribution donut, top aircraft bar chart, breakdown table |
-| `/aircraft` | Aircraft Analysis — per-aircraft flights, alert breakdown, top alerting flights, flight map |
-| `/flights` | Flight Analysis — all flights with route/duration, per-flight alert detail |
-| `/pilots` | Pilot Analysis — searchable/paginated pilot list, alarm breakdown, recent flights |
-| `/instructors` | Instructor Analysis — same as pilot view, filtered by role |
+| `/` | Home: KPI cards and top-registrations bar chart |
+| `/fleet` | Fleet Overview: alert distribution donut, top aircraft bar chart, breakdown table |
+| `/aircraft` | Aircraft Analysis: per-aircraft flights, alert breakdown, top alerting flights, flight map |
+| `/flights` | Flight Analysis: all flights with route/duration, per-flight alert detail |
+| `/pilots` | Pilot Analysis: searchable/paginated pilot list, alarm breakdown, recent flights |
+| `/instructors` | Instructor Analysis: same as pilot view, filtered by role |
 
 ## Quick start (Docker Compose)
 
@@ -99,7 +99,7 @@ DEV_BYPASS_LOGIN="false"
 
 ## API endpoints
 
-A full list of all 44 endpoints is documented in [ENDPOINTS.md](ENDPOINTS.md).
+A full list of all 43 endpoints is documented in [ENDPOINTS.md](ENDPOINTS.md).
 
 ## Alert colour scheme
 
