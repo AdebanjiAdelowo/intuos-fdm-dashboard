@@ -112,6 +112,9 @@ A full list of all 43 endpoints is documented in [ENDPOINTS.md](ENDPOINTS.md).
 | G-Force | Red `#ef4444` |
 | Hard Landing | Cyan `#06b6d4` |
 | High Roll | Violet `#a855f7` |
+| Low GS | Rose `#f43f5e` |
+| Altitude | Green `#10b981` |
+| Acc Z | Slate `#64748b` |
 
 Colours are centralised in `frontend/src/constants/alarmColors.ts` and applied consistently across all donut charts, bar charts, and progress-bar breakdowns.
 

@@ -12,6 +12,7 @@ node_modules/
 
 # Local secrets / runtime state
 config.yml
+config_notebook.yml
 expiration_date.txt
 secret_key.json
 .secret_key_storage/
