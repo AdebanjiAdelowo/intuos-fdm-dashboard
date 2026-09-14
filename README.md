@@ -126,3 +126,12 @@ python -m compileall -q .
 pytest
 ruff check .
 ```
+
+## Remaining Work
+
+Known code-level issues (an alarm-logic precedence bug, the default auth-bypass setting) have
+been fixed and are covered by tests. One item remains, external to this repository: rotation of
+the DB2 credential referenced in a prior security review. This cannot be resolved by a code or
+documentation change and is not attempted here. Portfolio-wide project status is tracked
+centrally in the author's Selected Projects documentation; this project's status there is
+EXTERNAL ACTION.
