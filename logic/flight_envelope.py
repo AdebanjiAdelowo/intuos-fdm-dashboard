@@ -137,7 +137,8 @@ class FlightEnvelopeChecker:
             if (
                 telemetry_item.pitch < self._low_height_limits.pitch_min
                 or telemetry_item.pitch > self._low_height_limits.pitch_max
-                and self._low_height_limits.acc_x_danger_range[0]
+            ) and (
+                self._low_height_limits.acc_x_danger_range[0]
                 < telemetry_item.acc_x
                 < self._low_height_limits.acc_x_danger_range[1]
             ):

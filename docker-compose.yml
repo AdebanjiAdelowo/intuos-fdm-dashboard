@@ -20,7 +20,10 @@ services:
       ANALYSIS_DASHBOARD_CONFIG: /app/config.yml
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
       PYTHONUNBUFFERED: 1
-      DEV_BYPASS_LOGIN: "true"
+      # Dev-only auth bypass (see app.py:login, controllers/login.py:retrieve_connection_params).
+      # Defaults to disabled; opt in locally with `DEV_BYPASS_LOGIN=true docker compose up`
+      # or a docker-compose.override.yml. Never set this to true outside local development.
+      DEV_BYPASS_LOGIN: ${DEV_BYPASS_LOGIN:-false}
     volumes:
       - ./config.yml:/app/config.yml:ro
       - .:/app
