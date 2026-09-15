@@ -127,11 +127,9 @@ pytest
 ruff check .
 ```
 
-## Remaining Work
+## Security Notes
 
-Known code-level issues (an alarm-logic precedence bug, the default auth-bypass setting) have
-been fixed and are covered by tests. One item remains, external to this repository: rotation of
-the DB2 credential referenced in a prior security review. This cannot be resolved by a code or
-documentation change and is not attempted here. Portfolio-wide project status is tracked
-centrally in the author's Selected Projects documentation; this project's status there is
-EXTERNAL ACTION.
+A prior security review identified and fixed an alarm-logic precedence bug and a default
+auth-bypass setting, both now covered by tests. Rotating the DB2 credential used in earlier
+development is a remaining external action (not a code or documentation change) and is not
+addressed in this repository.
